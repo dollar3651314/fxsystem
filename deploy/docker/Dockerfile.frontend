@@ -1,0 +1,21 @@
+# 前端通用 Dockerfile：客户端 falconx-frontend / 管理端 falconx-console-frontend 共用
+# 用法：docker build --build-arg APP_DIR=falconx-frontend -f deploy/docker/Dockerfile.frontend -t falconx-frontend:demo .
+
+FROM node:24-alpine AS build
+
+ARG APP_DIR
+WORKDIR /src
+
+COPY ${APP_DIR}/package.json ${APP_DIR}/package-lock.json* ./
+# 用 install 代替 ci 容忍 lock 偶尔不同步；prefer-offline 优先用本地缓存（速度接近 ci）
+RUN npm install --no-audit --no-fund --prefer-offline --no-progress
+
+COPY ${APP_DIR}/ ./
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+COPY --from=build /src/dist /usr/share/nginx/html
+COPY deploy/docker/nginx-frontend.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80

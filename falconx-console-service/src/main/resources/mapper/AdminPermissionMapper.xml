@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.console.repository.mapper.AdminPermissionMapper">
+
+    <resultMap id="adminPermissionRecordMap" type="com.falconx.console.repository.mapper.record.AdminPermissionRecord">
+        <constructor>
+            <idArg column="code" javaType="java.lang.String"/>
+            <arg column="module" javaType="java.lang.String"/>
+            <arg column="action" javaType="java.lang.String"/>
+            <arg column="description" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectAllPermissions" resultMap="adminPermissionRecordMap">
+        SELECT code, module, action, description
+        FROM t_admin_permission
+        ORDER BY module ASC, action ASC
+    </select>
+
+    <select id="selectPermissionCodesByUserId" resultType="java.lang.String">
+        SELECT DISTINCT rp.permission_code
+        FROM t_admin_user_role ur
+        INNER JOIN t_admin_role_permission rp ON rp.role_id = ur.role_id
+        WHERE ur.user_id = #{userId}
+        ORDER BY rp.permission_code ASC
+    </select>
+
+    <insert id="insertIgnore">
+        INSERT IGNORE INTO t_admin_permission (id, code, module, action, description)
+        VALUES (#{id}, #{code}, #{module}, #{action}, #{description})
+    </insert>
+
+    <!-- P5 字典分页查询 -->
+    <resultMap id="adminPermissionListRecordMap" type="com.falconx.console.repository.mapper.record.AdminPermissionListRecord">
+        <constructor>
+            <idArg column="code" javaType="java.lang.String"/>
+            <arg column="module" javaType="java.lang.String"/>
+            <arg column="action" javaType="java.lang.String"/>
+            <arg column="description" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="role_count" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="permissionListWhere">
+        <where>
+            <if test="module != null and module != ''">
+                AND p.module = #{module}
+            </if>
+            <if test="action != null and action != ''">
+                AND p.action = #{action}
+            </if>
+            <if test="highRiskCodes != null and highRiskCodes.size() > 0">
+                AND p.code IN
+                <foreach collection="highRiskCodes" item="hrCode" open="(" separator="," close=")">
+                    #{hrCode}
+                </foreach>
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectPermissionsForList" resultMap="adminPermissionListRecordMap">
+        SELECT p.code, p.module, p.action, p.description, p.created_at,
+               COALESCE(rp.role_count, 0) AS role_count
+        FROM t_admin_permission p
+        LEFT JOIN (
+            SELECT permission_code, COUNT(*) AS role_count
+            FROM t_admin_role_permission
+            GROUP BY permission_code
+        ) rp ON rp.permission_code = p.code
+        <include refid="permissionListWhere"/>
+        ORDER BY p.module ASC, p.action ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPermissions" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_admin_permission p
+        <include refid="permissionListWhere"/>
+    </select>
+
+    <resultMap id="adminPermissionRoleRecordMap" type="com.falconx.console.repository.mapper.record.AdminPermissionRoleRecord">
+        <constructor>
+            <idArg column="role_id" javaType="java.lang.Long"/>
+            <arg column="role_code" javaType="java.lang.String"/>
+            <arg column="role_name" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectRolesByPermissionCode" resultMap="adminPermissionRoleRecordMap">
+        SELECT r.id AS role_id, r.code AS role_code, r.name AS role_name
+        FROM t_admin_role_permission rp
+        INNER JOIN t_admin_role r ON r.id = rp.role_id
+        WHERE rp.permission_code = #{permissionCode}
+        ORDER BY r.code ASC
+    </select>
+
+</mapper>

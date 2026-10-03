@@ -1,0 +1,44 @@
+# LOCAL-ONLY override（不要提交到 git）
+# 目的：绕开 Docker Desktop WSL 集成未启用时，ClickHouse 配置文件 bind-mount 把
+# Ubuntu fs 路径解析成空目录的问题（容器内 default-user.xml 变成 directory，
+# entrypoint 报 "Is a directory" 后无限重启）。
+#
+# 这里用 Compose v2.23+ 的 configs.content 把 XML 内容直接内联到 compose 文件里，
+# 完全不走 host 路径，dockerd 在 docker-desktop 发行版里直接拿到内容。
+# volumes 列表用 !override 标签整体替换基础 compose 里的两个挂载，只留 data 命名卷。
+#
+# 正经修复：Docker Desktop → Settings → Resources → WSL Integration → 打开
+# Ubuntu-22.04 → Apply & Restart。集成开了之后这个 override 文件可以删掉。
+
+services:
+  clickhouse:
+    volumes: !override
+      - falconx-clickhouse-data:/var/lib/clickhouse
+    configs:
+      - source: clickhouse_default_user
+        target: /etc/clickhouse-server/users.d/default-user.xml
+        mode: 0440
+    # 基础 compose 的 healthcheck 没带 --password，配置启用密码后 SELECT 1
+    # 会被认证拒掉，容器永远停留在 health: starting。本地一并修掉。
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user default --password falconx --query 'SELECT 1' >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+configs:
+  clickhouse_default_user:
+    content: |
+      <clickhouse>
+        <users>
+          <default>
+            <networks>
+              <ip>::1</ip>
+              <ip>127.0.0.1</ip>
+              <ip>172.16.0.0/12</ip>
+              <ip>10.0.0.0/8</ip>
+            </networks>
+            <password>falconx</password>
+          </default>
+        </users>
+      </clickhouse>

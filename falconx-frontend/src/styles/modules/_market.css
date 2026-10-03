@@ -1,0 +1,518 @@
+/* FalconX H5 — market 视图 / watchlist / chart mobile 适配
+ * 桌面（≥ 768px）保持原 global.css 中 .market-list / .market-row / .market-chart 样式不变。
+ * 仅在 < 768px 改为垂直 stack + 紧凑卡片 + 触摸 target。
+ *
+ * 2026-05-24 v8 重写：
+ * - market view 整体 block flow（不依赖 flex/grid corner case）
+ * - watchlist 296px / chart 520px 显式 px height（避免 STAGE-12 mobile rule
+ *   覆盖；已在 global.css 把 STAGE-12 改 tablet-only）
+ * - market-row symbol+meta 改用 grid 2 列布局（symbol 左 strong / meta 右 ellipsis）
+ *   修复 symbol 截切
+ * - OrderTicketFab 改 inline relative（不 fixed），跟随 scroll，
+ *   不再永远遮挡底部 §04 交易明细内容
+ * - chart__metrics mobile 隐藏（信息已在 chart panel header 显示）
+ */
+
+@media (max-width: 767px) {
+  /* ============ market 视图 block stack 布局 ============ */
+  .trading-terminal--market {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow: visible !important;
+  }
+
+  .terminal-workspace--market {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    /* 2026-05-28：bottom-nav 的避让已经由 .fx-mobile-shell__main padding-bottom 处理，
+     * 这里不再加 padding-bottom，避免双层叠加在 §04 下方留出 ~88px 空白带。 */
+    padding: 0 !important;
+    gap: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* ============ MarketWatchlist H5 紧凑模式 ============
+   * 2026-05-28 二轮：H5 chart 移到首屏，watchlist 下沉到 chart 下方，压成 248px 紧凑滚动卡，
+   * 用户挑符号时滚动这一段；首屏视线主要在 K 线。原 296px 改 248 给 chart 多让 50+ 像素。
+   */
+  .market-list {
+    display: flex !important;
+    flex-direction: column !important;
+    border-right: 0;
+    border-top: 1px solid var(--fx-hairline);
+    border-bottom: 1px solid var(--fx-hairline);
+    height: 248px !important;
+    min-height: 248px !important;
+    max-height: 248px !important;
+    overflow: hidden !important;
+    box-sizing: border-box;
+  }
+
+  .market-list__rows {
+    flex: 1 1 auto;
+    min-height: 100px;
+    max-height: none;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .market-list .fx-panel-head,
+  .market-list__search,
+  .market-list__tabs-wrap,
+  .market-list__tabs {
+    flex-shrink: 0;
+  }
+
+  .market-list__tabs-wrap {
+    margin: 6px 14px 8px;
+    gap: 8px;
+  }
+
+  .market-list__tabs-wrap::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 2px;
+    width: 28px;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(11, 14, 18, 0), var(--fx-terminal-bg));
+  }
+
+  .market-list__tabs-label {
+    display: inline-flex;
+  }
+
+  .market-list__tabs {
+    margin: 0;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .market-list__tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ============ market-row 统一 72px + grid layout 修 symbol 截切 ============ */
+  .market-row {
+    display: grid !important;
+    grid-template-rows: auto auto !important;
+    align-content: center;
+    padding: 10px 14px !important;
+    height: 72px !important;
+    min-height: 72px !important;
+    max-height: 72px !important;
+    gap: 4px !important;
+    position: relative;
+    border-bottom: 1px solid var(--fx-hairline);
+    transition: transform 80ms ease, background 80ms ease;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .market-list__rows--virtualized .market-row {
+    right: 0;
+  }
+
+  .market-row:active {
+    transform: scale(0.985);
+    background: rgba(84, 230, 255, 0.04);
+  }
+
+  .market-row.selected {
+    background: rgba(84, 230, 255, 0.06);
+  }
+
+  .market-row.selected::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--fx-cyan);
+  }
+
+  /* row1: symbol+meta 用 grid 2 列 (symbol 左固定, meta 右 ellipsis)
+   * 修复 v7 截图 symbol 截切 — 用 grid auto 1fr 保证 symbol 完整显示
+   */
+  .market-row > span:first-child {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    column-gap: 8px;
+    align-items: baseline;
+    line-height: 1.2;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .market-row > span:first-child strong {
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  .market-row > span:first-child small {
+    color: var(--fx-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: var(--fx-eyebrow-letter);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  /* row2: quote 紧凑一行 */
+  .market-row__quote {
+    display: flex !important;
+    align-items: baseline;
+    gap: 8px;
+    font-family: var(--fx-mono-stack);
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    line-height: 1.3;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .market-row__quote b {
+    display: inline-flex !important;
+    align-items: baseline;
+    gap: 3px;
+  }
+
+  .market-row__quote b small {
+    color: var(--fx-subtle);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: var(--fx-eyebrow-letter);
+  }
+
+  .market-row__quote em {
+    font-style: normal;
+    font-size: 9px;
+    letter-spacing: var(--fx-eyebrow-letter);
+    color: var(--fx-cyan);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .market-row__quote time {
+    display: none;
+  }
+
+  /* ============ MarketChart H5 占满首屏 ============
+   * 2026-05-28 三轮：chip 直达入口已强化，K 线可以更激进占首屏。
+   *   100dvh - mobile header ~56px - 安全余量 ~36 = chart 区
+   * iPhone 14 (844)：≈ 100dvh - 92 ≈ 752px（比上一轮 724 +28）；
+   * Pixel 7a (915)：≈ 823；
+   * iPhone SE (667)：≈ 575；floor 520 防极小屏过压。下方 §04 / watchlist 全靠
+   * 主动滚动 + chip 跳转访问。 */
+  .market-chart {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: max(520px, calc(100dvh - 92px)) !important;
+    max-height: none !important;
+    border-top: 0 !important;
+    border-bottom: 1px solid var(--fx-border-strong);
+    overflow: hidden;
+  }
+  /* H5 chart panel head：chips 放不下就自动换到第二行，仍保留 §02 标题 + 提示 + chips 显式入口 */
+  .market-chart .fx-panel-head {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .market-chart .fx-panel-head .fx-jump-chips {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .market-chart .fx-panel-head .fx-jump-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .market-chart .fx-panel-head .fx-jump-chip {
+    height: 30px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  /* H5 TradingTabs panel head：返回 K 线 chip 占位规则同上 */
+  .fx-trading-tabs .fx-panel-head {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .market-chart__header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-areas:
+      "identity identity"
+      "price price"
+      "timeframes bidask" !important;
+    gap: 8px !important;
+    align-items: start;
+  }
+
+  .market-chart__header,
+  .market-chart__actions {
+    flex-shrink: 0;
+  }
+
+  .market-chart__identity {
+    grid-area: identity;
+  }
+
+  .market-chart__price {
+    grid-area: price;
+    justify-items: start;
+  }
+
+  .market-chart__timeframes {
+    grid-area: timeframes;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .market-chart__bidask-toggle {
+    grid-area: bidask;
+    align-self: stretch;
+    justify-self: end;
+    width: auto;
+    min-height: 35px;
+    margin-left: 6px;
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+
+  /* 2026-05-28 四轮 H5 fix：原 .market-chart__canvas display:block，里层
+   * .market-chart__tradingview-shell 的 height:100% 在 flex 父链下不解析（fallback 到
+   * min-height 300px），结果 canvas 485 / shell 300，K 线下方塞了 185px 黑空白。
+   * 改 canvas 为 flex 列容器，shell 直接 flex:1 拉满，min-height 归 0 让 flex 算尺寸。 */
+  .market-chart__canvas {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 300px !important;
+    overflow: hidden;
+    width: 100%;
+  }
+  .market-chart__tradingview-shell {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  /* TV chart 容器再用 flex:1 拉满 shell。spread-band / legends 是 absolute，不参与 flex 流。 */
+  .market-chart__tradingview {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  /* 隐藏 mobile 不必要的 chart 子元素，节省高度 */
+  .market-chart__metrics {
+    display: none !important;
+  }
+
+  /* timeframe row segmented control */
+  .market-chart .timeframe-row,
+  .market-chart .chart-timeframe-row {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--fx-hairline);
+  }
+
+  .market-chart .timeframe-row button,
+  .market-chart .chart-timeframe-row button {
+    min-height: 32px;
+    min-width: 44px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: var(--fx-mono-stack);
+    letter-spacing: 0.02em;
+    color: var(--fx-muted);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    cursor: pointer;
+    transition: color 120ms ease, background 120ms ease;
+    position: relative;
+  }
+
+  .market-chart .timeframe-row button:active,
+  .market-chart .chart-timeframe-row button:active {
+    background: rgba(84, 230, 255, 0.12);
+  }
+
+  .market-chart .timeframe-row button.active,
+  .market-chart .chart-timeframe-row button.active,
+  .market-chart .timeframe-row button[aria-pressed="true"],
+  .market-chart .chart-timeframe-row button[aria-pressed="true"] {
+    color: var(--fx-cyan);
+    background: var(--fx-surface-3);
+  }
+
+  .market-chart .timeframe-row button.active::after,
+  .market-chart .chart-timeframe-row button.active::after,
+  .market-chart .timeframe-row button[aria-pressed="true"]::after,
+  .market-chart .chart-timeframe-row button[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 0;
+    height: 1px;
+    background: var(--fx-cyan);
+  }
+
+  /* ============ TradingTabs 独立滚动区 ============ */
+  .fx-trading-tabs {
+    min-height: 420px !important;
+    height: min(520px, calc(100dvh - var(--fx-bottom-nav-height) - 72px)) !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    flex: 0 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding-bottom: var(--fx-space-4) !important;
+  }
+
+  .trading-tabs {
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* fx-table mobile 用 display: table 让行可见，桌面 display: block + overflow-x
+   * 是为了 wide table 横滚，mobile 我们已经把 4 历史 Table 转 cards (Phase 2B-2)，
+   * 持仓 用 PositionItemCard (Phase 2B-1)，所以 fx-table 仍可见的是 trading-tabs
+   * 内含 fx-positions-summary 行。强制让其子内容 visible。
+   */
+  .fx-trading-tabs .fx-tab-content {
+    overflow: visible !important;
+    min-height: 0 !important;
+  }
+
+  .fx-tab-panel {
+    flex: 1 1 auto !important;
+    min-height: 220px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
+
+  /* 持仓 cards (Phase 2B-1) 列表撑开 */
+  .fx-positions-cards {
+    overflow: visible !important;
+  }
+
+  /* fx-history-cards (Phase 2B-2) 同理 */
+  .fx-history-cards {
+    overflow: visible !important;
+  }
+
+  /* ============ OrderTicketFab inline (不 fixed) ============
+   * 2026-05-24 v8: 取消 position: fixed (v1-v7 都用 fixed 永远遮挡 §04 持仓内容)
+   * 改 position: relative inline，紧贴 chart 下方 + trading-tabs 之前。
+   * scroll 时跟随，不遮挡。user scroll 到 trading-tabs 时 FAB 滚走，
+   * 想下单时 scroll 回 chart 即可。这是 binance/okx mobile app 标准 pattern。
+   */
+  .order-ticket-fab {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: calc(100% - 32px) !important;
+    margin: 12px 16px !important;
+    height: 56px !important;
+    padding: 0 var(--fx-space-4) !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: var(--fx-surface-2) !important;
+    border: 1px solid var(--fx-border-strong) !important;
+    border-radius: var(--fx-radius-md) !important;
+    color: var(--fx-text) !important;
+    cursor: pointer;
+    z-index: 1;
+    box-shadow: 0 6px 16px -10px rgba(0, 0, 0, 0.6);
+    transition: box-shadow 120ms ease, transform 80ms ease;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .order-ticket-fab:active {
+    box-shadow: inset 0 0 0 2px var(--fx-cyan);
+    transform: scale(0.99);
+  }
+
+  .order-ticket-fab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .order-ticket-fab__info {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: baseline !important;
+    gap: 10px !important;
+    overflow: hidden;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .order-ticket-fab__symbol {
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  .order-ticket-fab__price {
+    font-family: var(--fx-mono-stack);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--fx-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .order-ticket-fab__empty {
+    font-size: 12px;
+    color: var(--fx-muted);
+    letter-spacing: var(--fx-eyebrow-letter);
+    text-transform: uppercase;
+  }
+
+  .order-ticket-fab__cta {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 6px;
+    color: var(--fx-cyan);
+    font-size: 13px;
+    font-family: var(--fx-mono-stack);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  /* ============ market 页面末尾紧贴 BottomNav 顶沿 ============ */
+  /* 2026-05-28：bottom-nav 让位由 .fx-mobile-shell__main padding-bottom 处理；
+   * 这里不再给 §04 留 margin-bottom，否则又会重新出现下方空白带。 */
+  .fx-trading-tabs {
+    margin-bottom: 0 !important;
+  }
+}

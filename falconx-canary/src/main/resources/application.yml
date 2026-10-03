@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: falconx-canary
+  main:
+    web-application-type: none
+    banner-mode: off
+logging:
+  level:
+    root: WARN
+    com.falconx.canary: INFO
+
+canary:
+  base-url:
+    gateway: ${CANARY_BASE_URL_GATEWAY:http://localhost:18080}
+    identity: ${CANARY_BASE_URL_IDENTITY:http://localhost:18081}
+    market: ${CANARY_BASE_URL_MARKET:http://localhost:18082}
+    trading-core: ${CANARY_BASE_URL_TRADING_CORE:http://localhost:18083}
+    wallet: ${CANARY_BASE_URL_WALLET:http://localhost:18084}
+    console: ${CANARY_BASE_URL_CONSOLE:http://localhost:18085}
+  admin:
+    username: ${CANARY_ADMIN_USERNAME:superadmin}
+    password: ${CANARY_ADMIN_PASSWORD:}
+  user:
+    username: ${CANARY_USER_USERNAME:}
+    password: ${CANARY_USER_PASSWORD:}
+  recon:
+    max-unmatched: ${CANARY_RECON_MAX_UNMATCHED:100}
+  timeout:
+    default-seconds: 30
+    deposit-listen-seconds: 60
+    withdraw-seconds: 120

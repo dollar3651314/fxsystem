@@ -1,0 +1,158 @@
+spring:
+  # 2026-05-27 Sprint 6 顺序5：JDK 25 + Spring Boot 4 虚拟线程（Tomcat 请求 + @Async + @Scheduled）。
+  # JEP 491 已解决 synchronized pinning；自定义线程池（分区 executor/dispatcher/扫块 poller）不受影响仍用平台线程。
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: falconx-wallet-service
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  datasource:
+    url: jdbc:mysql://localhost:3306/falconx_wallet?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${FALCONX_WALLET_DB_USERNAME}
+    password: ${FALCONX_WALLET_DB_PASSWORD}
+    hikari:
+      # STAGE-12 perf：默认 HikariCP idleTimeout/maxLifetime 不主动 evict，
+      # 实测 MySQL processlist 多条 Sleep>16000s（4-7h）。显式收紧到 10min/30min。
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      keepalive-time: 300000
+  kafka:
+    bootstrap-servers: localhost:9092
+    listener:
+      missing-topics-fatal: false
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # 2026-05-26 Sprint 5 A1：批量 + 压缩
+      batch-size: 16384
+      properties:
+        linger.ms: 10
+        compression.type: lz4
+    consumer:
+      # 2026-05-26 Sprint 5 A2：latest → earliest，inbox 幂等下重复消费安全
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+
+server:
+  port: 18084
+
+logging:
+  level:
+    org.web3j.protocol.websocket.WebSocketClient: off
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level --- [%15.15t] [traceId=%X{traceId:-}] %logger{39} : %msg%n%ex"
+
+falconx:
+  wallet:
+    # STAGE-2-DEPOSIT R4：internal API token；dev/test 默认与 gateway 一致，prod 必须由环境变量覆盖
+    internal-api:
+      token: ${FALCONX_INTERNAL_API_TOKEN:falconx-internal-dev-token}
+    allocation:
+      start-index: 1
+    derivation:
+      eth-account-xpub: ${FALCONX_WALLET_ETH_ACCOUNT_XPUB:}
+      tron-account-xpub: ${FALCONX_WALLET_TRON_ACCOUNT_XPUB:}
+    # STAGE-7-WITHDRAW Phase 3：链上签名私钥占位。
+    # 默认空 → 注入 KmsSignerStub（broadcast 时显式失败 20014）。
+    # dev / staging 可通过 env 注入；Commit 9 起 LocalKmsSigner 在 dev|staging profile 下激活。
+    kms:
+      erc20:
+        private-key-pem: ${FALCONX_WALLET_ERC20_PRIVATE_KEY_PEM:}
+        from-address: ${FALCONX_WALLET_ERC20_FROM_ADDRESS:}
+      trc20:
+        private-key-pem: ${FALCONX_WALLET_TRC20_PRIVATE_KEY_PEM:}
+        from-address: ${FALCONX_WALLET_TRC20_FROM_ADDRESS:}
+    kafka:
+      deposit-detected-topic: falconx.wallet.deposit.detected
+      deposit-confirmed-topic: falconx.wallet.deposit.confirmed
+      deposit-reversed-topic: falconx.wallet.deposit.reversed
+      # STAGE-5-WALLET-PROVISION：监听 identity 注册事件触发预分配
+      identity-user-registered-topic: falconx.identity.user.registered
+      identity-user-registered-group: falconx.wallet-service.user-registered-consumer
+      # STAGE-7-WITHDRAW Phase 3：出金 3 事件 + reviewed 消费组
+      withdraw-broadcast-topic: falconx.wallet.withdraw.broadcast
+      withdraw-confirmed-topic: falconx.wallet.withdraw.confirmed
+      withdraw-failed-topic: falconx.wallet.withdraw.failed
+      trading-withdraw-reviewed-topic: falconx.trading.withdraw.reviewed
+      trading-withdraw-reviewed-group: falconx.wallet-service.trading-withdraw-reviewed-consumer
+    # STAGE-7-WITHDRAW Phase 3：出金链路独立 RPC（与入金扫块 chains.eth.rpc-url 隔离）
+    withdraw:
+      eth:
+        rpc-url: ${Alchemy_Ethereum_Sepolia_HTTPS:http://localhost:8545}
+        chain-id: ${FALCONX_WALLET_ERC20_CHAIN_ID:11155111}
+        usdt-contract: ${FALCONX_WALLET_ERC20_USDT_CONTRACT:}
+        usdt-decimals: ${FALCONX_WALLET_ERC20_USDT_DECIMALS:6}
+        usdc-contract: ${FALCONX_WALLET_ERC20_USDC_CONTRACT:}
+        usdc-decimals: ${FALCONX_WALLET_ERC20_USDC_DECIMALS:6}
+        gas-limit: 100000
+        gas-price-max-gwei: 100
+        min-confirmations: 12
+        confirmation-scheduler-interval: 30s
+    chains:
+      eth:
+        # STAGE-2-DEPOSIT bugfix 2026-05-19：与出金 RPC 对齐，读 .env 里的 Alchemy_Ethereum_Sepolia_HTTPS。
+        # 原硬编码 localhost:8545 导致 ETH 扫块器从未连上 Sepolia，syy@1.com 转入 SepoliaETH 全部漏检。
+        rpc-url: ${Alchemy_Ethereum_Sepolia_HTTPS:http://localhost:8545}
+        scan-interval: ${FALCONX_WALLET_ETH_SCAN_INTERVAL:5m}
+        required-confirmations: 12
+        cursor-type: block
+        initial-cursor: "0"
+        usdt-contract: ${FALCONX_WALLET_ERC20_USDT_CONTRACT:}
+        usdt-decimals: ${FALCONX_WALLET_ERC20_USDT_DECIMALS:6}
+        usdc-contract: ${FALCONX_WALLET_ERC20_USDC_CONTRACT:}
+        usdc-decimals: ${FALCONX_WALLET_ERC20_USDC_DECIMALS:6}
+      bsc:
+        rpc-url: http://localhost:8546
+        scan-interval: ${FALCONX_WALLET_BSC_SCAN_INTERVAL:5m}
+        required-confirmations: 15
+        cursor-type: block
+        initial-cursor: "0"
+      tron:
+        rpc-url: ${ALCHEMY_ETHEREUM_NILETEST_HTTPS:${FALCONX_WALLET_TRC20_RPC_URL:http://localhost:8090}}
+        solidity-rpc-url: ${ALCHEMY_ETHEREUM_NILETEST_HTTPS:${FALCONX_WALLET_TRC20_SOLIDITY_RPC_URL:http://localhost:8091}}
+        scan-interval: ${FALCONX_WALLET_TRC20_SCAN_INTERVAL:5m}
+        required-confirmations: 19
+        cursor-type: block
+        initial-cursor: "0"
+        usdt-contract: ${FALCONX_WALLET_TRC20_USDT_CONTRACT:}
+        usdt-decimals: ${FALCONX_WALLET_TRC20_USDT_DECIMALS:6}
+      sol:
+        rpc-url: http://localhost:8899
+        scan-interval: ${FALCONX_WALLET_SOL_SCAN_INTERVAL:5m}
+        required-confirmations: 32
+        cursor-type: slot
+        initial-cursor: "0"
+
+# STAGE-11-OBS-RECON §14.5 actuator endpoints（运维 / canary / k8s probe 用，不暴露给前端）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers,prometheus,threaddump,heapdump
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+    loggers:
+      enabled: true
+  info:
+    git:
+      mode: simple
+    build:
+      enabled: true

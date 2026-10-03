@@ -1,0 +1,66 @@
+# promtool 单测：falconx-platform.rules.yml
+# 运行：promtool test rules deploy/monitoring/prometheus/rules/falconx-platform.rules_test.yml
+rule_files:
+  - falconx-platform.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # FalconxServiceDown：抓取失败（up==0）持续 ≥1m 触发。
+  - interval: 1m
+    input_series:
+      - series: 'up{job="falconx-market", instance="host.docker.internal:18082", service="market"}'
+        values: "0 0 0"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: FalconxServiceDown
+        exp_alerts:
+          - exp_labels:
+              severity: P0
+              job: falconx-market
+              instance: host.docker.internal:18082
+              service: market
+            exp_annotations:
+              summary: "FalconX 服务不可达：falconx-market"
+              description: "falconx-market（host.docker.internal:18082）/actuator/prometheus 抓取失败已持续 1 分钟，疑似宕机或 health DOWN。5 分钟内确认是否降级或回滚。"
+
+  # 服务正常（up==1）不触发。
+  - interval: 1m
+    input_series:
+      - series: 'up{job="falconx-trading-core", instance="host.docker.internal:18083"}'
+        values: "1 1 1"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: FalconxServiceDown
+        exp_alerts: []
+
+  # FalconxJvmHeapHigh：堆使用率 ≥0.9 持续 5m 触发。
+  - interval: 1m
+    input_series:
+      - series: 'jvm_memory_used_bytes{area="heap", job="falconx-trading-core", instance="i1"}'
+        values: "900 900 900 900 900 900 900"
+      - series: 'jvm_memory_max_bytes{area="heap", job="falconx-trading-core", instance="i1"}'
+        values: "1000 1000 1000 1000 1000 1000 1000"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: FalconxJvmHeapHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              job: falconx-trading-core
+              instance: i1
+            exp_annotations:
+              summary: "JVM 堆使用率偏高：falconx-trading-core"
+              description: "falconx-trading-core 堆使用率 ≥ 90% 已持续 5 分钟，存在 OOM 风险（local-start 已配 -XX:+HeapDumpOnOutOfMemoryError）。"
+
+  # 堆使用率 0.5 不触发。
+  - interval: 1m
+    input_series:
+      - series: 'jvm_memory_used_bytes{area="heap", job="falconx-market", instance="i1"}'
+        values: "500x6"
+      - series: 'jvm_memory_max_bytes{area="heap", job="falconx-market", instance="i1"}'
+        values: "1000x6"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: FalconxJvmHeapHigh
+        exp_alerts: []

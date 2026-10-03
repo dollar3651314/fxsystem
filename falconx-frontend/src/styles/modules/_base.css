@@ -1,0 +1,7 @@
+/* FalconX H5 — base reset + typography（Phase 0 骨架，Phase 2 从 global.css 搬内容） */
+
+/* iOS 100vh 不准修复：所有需要"全屏高度"的容器用 100dvh，fallback 100vh */
+.fx-full-height {
+  height: 100vh;
+  height: 100dvh;
+}

@@ -1,0 +1,60 @@
+spring:
+  datasource:
+    username: root
+    password: root
+  data:
+    redis:
+      host: localhost
+      port: 6380
+
+falconx:
+  console:
+    password:
+      bcrypt-strength: 4  # 加速测试（生产/dev 默认 12）
+    security:
+      ip-whitelist-enabled: false
+      login-failure-limit: 5
+      login-lock-duration: 30s  # 缩短测试时长
+    initial-super-admin:
+      default-password: 'TestAdmin@1234'  # 满足密码策略 (12 字符 + 大小写 + 数字 + 特殊字符)
+    key-pair:
+      # 测试专用 RSA 密钥（与 dev / prod 隔离），与 identity stage5 测试密钥不同
+      private-key-pem: |
+        -----BEGIN PRIVATE KEY-----
+        MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDc3xftBiG+MABF
+        4D5tnqUEowtS9fZjSGQHIvM3LAJ3pCY2p/NuHVCE1YUiOY6MZiKaeQgfoPCMRdiq
+        oa0RIa18q/7it2Ybhapov2LGYW9nxSfBU34jan/1fstCiQFWFWgzYqEwX/vnirDZ
+        olhP/gOQxopd3M97ucAi9On2JWj9bwvhAbOIpLFV+lCM6oCmYqGpS3XSKTS4592p
+        iwu7NKPF6EOqh8MMfYTNJl6ZMsLqObQ8y44B53xEZLIie2GeNMfEsAzuJImQdPMf
+        wcJnXXb8+eYEKXKJBEr61u21QcEx3I0p+i8cPInZsqA56lDcVvYuK2e1SDgmxI9P
+        VpupSFLBAgMBAAECggEAAjzgaS5euSaTWiHjgAjTczCTtMt5K5hYKxpXjH+Nptiq
+        6nLZLIxvfGkNaENdBl8iip4fTvK6fTFX+KKatkm5EEJN2s4w4qaAC3+k6I2kK1D8
+        DiFibclucnZOaOYqdUzSOXMOXwcZ7kahdBMJAgZ40sawMDNEhuRi5ffFRxEp9ydc
+        DVLHUKA8EmzUS7+t7PtoJwBIsWnJV+tdHB1C32u+MQY1Hf9kC8fAUr1Prs/z9K5l
+        Oe1KgYWO0swh0g8h7Z9vLHo4ZqX8qkt/lXaFySmwJwYT/fsVojc6CVfqOZAwY6la
+        1fYOGIyULqBDPrBLu4Bd8Ylomw5Y0owo3smHlCUp4QKBgQD1V3eZLByJAMkhFy81
+        ag3UUcZFT8dMXFwYSiOEZAuvUatiJU3oe9JTR1GjQh+MloMm6RlGibRtg4Bcd51o
+        lDqIZKnyTNAqmNXUcV0m0fsLWEuHQzsXJk+rPoA+WxoEZAxaPTb1zznFPbMl1BW4
+        zgMF/OkwErCt37LmzJRbNcmMEwKBgQDmd3v6NJvvygyqnEuctzDlFpS6pnBEO+NH
+        HbgcqviGqg9VGp7ZV6/Hsex4+q9yOiHEuIJOGI90Zk6Bi6gAdWdvN2PWcJoIf0Tz
+        IT5X2XFVx0qCM2hWQf0CNvWx3dngVNoIAgJuRc+YMWq1Z4y4hQlbaQbJ9kXaICLY
+        uVoDqS9YWwKBgQDorV1lzSn63N3jHiPNmpknBa7uSS0QRH+rIZTxmBhk2yWY3Rw4
+        IkZkaL0KAkn9gTk9C9DGzw5o1lBEYcTNS9b/R8jNXQAHhg81fZYEnRxjtAddbut5
+        lwHzvEDP4oKYK3Jzmp6nHTMC1vMyKyO2stq3MRbOWsto+0CmFtuUbTyKNQKBgHom
+        E+id35Qs45+9bPnnwht5Z2Sx+EjB8QjtQHq5RzWghrXVgSGyrvDJZYsNWtXQ57rr
+        C+02aToJS0yv52Au2Z6BngG29nzQb4vpL7DCB6auFNiDRKaLHP0CgiA+dE7IyjJ6
+        Vi16BLgmYOc6tcPKhxYSyU1boNQmOjHhs0rDbduHAoGBAK9OVaS30xhusIajVsg8
+        CtlAuNhVPrIFUc8f5tUYb014plNb1gkPxDomDCsh0TSm2pyqAKt4QqaMI6GwOtb4
+        jUcXDAtivhm8wjDLZiNiaYW7sVYlKcWG2lwMjMAoLGeCLpJngEqW1Xvkke1yfrEl
+        4i3w2eVr/q3/FZ8i00dj89/u
+        -----END PRIVATE KEY-----
+      public-key-pem: |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3N8X7QYhvjAAReA+bZ6l
+        BKMLUvX2Y0hkByLzNywCd6QmNqfzbh1QhNWFIjmOjGYimnkIH6DwjEXYqqGtESGt
+        fKv+4rdmG4WqaL9ixmFvZ8UnwVN+I2p/9X7LQokBVhVoM2KhMF/754qw2aJYT/4D
+        kMaKXdzPe7nAIvTp9iVo/W8L4QGziKSxVfpQjOqApmKhqUt10ik0uOfdqYsLuzSj
+        xehDqofDDH2EzSZemTLC6jm0PMuOAed8RGSyInthnjTHxLAM7iSJkHTzH8HCZ112
+        /PnmBClyiQRK+tbttUHBMdyNKfovHDyJ2bKgOepQ3Fb2LitntUg4JsSPT1abqUhS
+        wQIDAQAB
+        -----END PUBLIC KEY-----

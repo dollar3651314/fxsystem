@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingLiquidationLogMapper">
+
+    <resultMap id="tradingLiquidationLogRecordMap" type="com.falconx.trading.repository.mapper.record.TradingLiquidationLogRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="user_id" javaType="java.lang.Long"/>
+            <arg column="position_id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="side" javaType="java.lang.Integer"/>
+            <arg column="margin_mode" javaType="java.lang.Integer"/>
+            <arg column="quantity" javaType="java.math.BigDecimal"/>
+            <arg column="entry_price" javaType="java.math.BigDecimal"/>
+            <arg column="liquidation_price" javaType="java.math.BigDecimal"/>
+            <arg column="mark_price" javaType="java.math.BigDecimal"/>
+            <arg column="price_ts" javaType="java.time.LocalDateTime"/>
+            <arg column="price_source" javaType="java.lang.String"/>
+            <arg column="loss" javaType="java.math.BigDecimal"/>
+            <arg column="fee" javaType="java.math.BigDecimal"/>
+            <arg column="margin_released" javaType="java.math.BigDecimal"/>
+            <arg column="platform_covered_loss" javaType="java.math.BigDecimal"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByUserIdPaginated" resultMap="tradingLiquidationLogRecordMap">
+        SELECT id,
+               user_id,
+               position_id,
+               symbol,
+               side,
+               margin_mode,
+               quantity,
+               entry_price,
+               liquidation_price,
+               mark_price,
+               price_ts,
+               price_source,
+               loss,
+               fee,
+               margin_released,
+               platform_covered_loss,
+               created_at
+        FROM t_liquidation_log
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(1)
+        FROM t_liquidation_log
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="insertTradingLiquidationLog"
+            parameterType="com.falconx.trading.repository.mapper.record.TradingLiquidationLogRecord">
+        INSERT INTO t_liquidation_log (
+            id,
+            user_id,
+            position_id,
+            symbol,
+            side,
+            margin_mode,
+            quantity,
+            entry_price,
+            liquidation_price,
+            mark_price,
+            price_ts,
+            price_source,
+            loss,
+            fee,
+            margin_released,
+            platform_covered_loss,
+            created_at
+        ) VALUES (
+            #{id},
+            #{userId},
+            #{positionId},
+            #{symbol},
+            #{sideCode},
+            #{marginModeCode},
+            #{quantity},
+            #{entryPrice},
+            #{liquidationPrice},
+            #{markPrice},
+            #{priceTs},
+            #{priceSource},
+            #{loss},
+            #{fee},
+            #{marginReleased},
+            #{platformCoveredLoss},
+            #{createdAt}
+        )
+    </insert>
+</mapper>

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.identity.repository.mapper.KycSubmissionMapper">
+
+    <resultMap id="submissionMap" type="com.falconx.identity.repository.mapper.record.KycSubmissionRecord">
+        <constructor>
+            <idArg column="id"            javaType="java.lang.Long"/>
+            <arg   column="user_id"       javaType="java.lang.Long"/>
+            <arg   column="level"         javaType="java.lang.Integer"/>
+            <arg   column="status"        javaType="java.lang.Integer"/>
+            <arg   column="id_type"       javaType="java.lang.Integer"/>
+            <arg   column="id_number"     javaType="java.lang.String"/>
+            <arg   column="submitted_at"  javaType="java.time.LocalDateTime"/>
+            <arg   column="reviewer_id"   javaType="java.lang.Long"/>
+            <arg   column="review_at"     javaType="java.time.LocalDateTime"/>
+            <arg   column="reject_reason" javaType="java.lang.String"/>
+            <arg   column="created_at"    javaType="java.time.LocalDateTime"/>
+            <arg   column="updated_at"    javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="documentMap" type="com.falconx.identity.repository.mapper.record.KycDocumentRecord">
+        <constructor>
+            <idArg column="id"             javaType="java.lang.Long"/>
+            <arg   column="submission_id"  javaType="java.lang.Long"/>
+            <arg   column="doc_type"       javaType="java.lang.Integer"/>
+            <arg   column="data_base64"    javaType="java.lang.String"/>
+            <arg   column="sha256"         javaType="java.lang.String"/>
+            <arg   column="mime_type"      javaType="java.lang.String"/>
+            <arg   column="created_at"     javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="subCols">
+        id, user_id, level, status, id_type, id_number, submitted_at,
+        reviewer_id, review_at, reject_reason, created_at, updated_at
+    </sql>
+
+    <insert id="insertSubmission" parameterType="com.falconx.identity.repository.mapper.record.KycSubmissionRecord">
+        INSERT INTO t_kyc_submission (<include refid="subCols"/>) VALUES (
+            #{id}, #{userId}, #{level}, #{status}, #{idType}, #{idNumber}, #{submittedAt},
+            #{reviewerId}, #{reviewAt}, #{rejectReason}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <insert id="insertDocument" parameterType="com.falconx.identity.repository.mapper.record.KycDocumentRecord">
+        INSERT INTO t_kyc_document (id, submission_id, doc_type, data_base64, sha256, mime_type, created_at) VALUES (
+            #{id}, #{submissionId}, #{docType}, #{dataBase64}, #{sha256}, #{mimeType}, #{createdAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="submissionMap">
+        SELECT <include refid="subCols"/> FROM t_kyc_submission WHERE id = #{id}
+    </select>
+
+    <select id="selectLatestByUserId" resultMap="submissionMap">
+        SELECT <include refid="subCols"/> FROM t_kyc_submission
+        WHERE user_id = #{userId}
+        ORDER BY submitted_at DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="countPendingByUserId" resultType="int">
+        SELECT COUNT(1) FROM t_kyc_submission WHERE user_id = #{userId} AND status = 0
+    </select>
+
+    <select id="selectAdminPaginated" resultMap="submissionMap">
+        SELECT <include refid="subCols"/> FROM t_kyc_submission
+        <where>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+        </where>
+        ORDER BY submitted_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminFiltered" resultType="long">
+        SELECT COUNT(1) FROM t_kyc_submission
+        <where>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+        </where>
+    </select>
+
+    <select id="selectDocumentsBySubmission" resultMap="documentMap">
+        SELECT id, submission_id, doc_type, data_base64, sha256, mime_type, created_at
+        FROM t_kyc_document WHERE submission_id = #{submissionId}
+        ORDER BY doc_type ASC
+    </select>
+
+    <update id="updateReview">
+        UPDATE t_kyc_submission
+        SET status = #{status},
+            reviewer_id = #{reviewerId},
+            review_at = #{reviewAt},
+            reject_reason = #{rejectReason}
+        WHERE id = #{id} AND status = 0
+    </update>
+
+    <update id="updateUserKycLevel">
+        UPDATE t_user
+        SET kyc_level = #{level}, updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{userId}
+    </update>
+</mapper>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.repository.mapper.MarketSymbolGroupMarkupMapper">
+
+    <resultMap id="MarketSymbolGroupMarkupRecordMap"
+               type="com.falconx.market.repository.mapper.record.MarketSymbolGroupMarkupRecord">
+        <constructor>
+            <arg column="group_code" javaType="java.lang.String"/>
+            <arg column="platform_symbol" javaType="java.lang.String"/>
+            <arg column="bid_extra" javaType="java.math.BigDecimal"/>
+            <arg column="ask_extra" javaType="java.math.BigDecimal"/>
+            <arg column="enabled" javaType="java.lang.Integer"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        group_code,
+        platform_symbol,
+        bid_extra,
+        ask_extra,
+        enabled,
+        created_at,
+        updated_at
+    </sql>
+
+    <select id="selectAllEnabled" resultMap="MarketSymbolGroupMarkupRecordMap">
+        SELECT <include refid="columns"/>
+        FROM t_symbol_group_markup
+        WHERE enabled = 1
+        ORDER BY group_code ASC, platform_symbol ASC
+    </select>
+
+    <select id="selectChangedSince" resultMap="MarketSymbolGroupMarkupRecordMap">
+        SELECT <include refid="columns"/>
+        FROM t_symbol_group_markup
+        WHERE updated_at &gt; #{since}
+        ORDER BY updated_at ASC
+    </select>
+
+    <select id="selectByPk" resultMap="MarketSymbolGroupMarkupRecordMap">
+        SELECT <include refid="columns"/>
+        FROM t_symbol_group_markup
+        WHERE group_code = #{groupCode}
+          AND platform_symbol = #{platformSymbol}
+    </select>
+
+    <select id="selectByFilters" resultMap="MarketSymbolGroupMarkupRecordMap">
+        SELECT <include refid="columns"/>
+        FROM t_symbol_group_markup
+        <where>
+            <if test="groupCode != null and groupCode != ''">
+                AND group_code = #{groupCode}
+            </if>
+            <if test="symbolLike != null and symbolLike != ''">
+                AND platform_symbol LIKE CONCAT('%', #{symbolLike}, '%')
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+        ORDER BY group_code ASC, platform_symbol ASC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByFilters" resultType="long">
+        SELECT COUNT(*)
+        FROM t_symbol_group_markup
+        <where>
+            <if test="groupCode != null and groupCode != ''">
+                AND group_code = #{groupCode}
+            </if>
+            <if test="symbolLike != null and symbolLike != ''">
+                AND platform_symbol LIKE CONCAT('%', #{symbolLike}, '%')
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO t_symbol_group_markup
+            (group_code, platform_symbol, bid_extra, ask_extra, enabled)
+        VALUES
+            (#{groupCode}, #{platformSymbol}, #{bidExtra}, #{askExtra}, #{enabled})
+        ON DUPLICATE KEY UPDATE
+            bid_extra = VALUES(bid_extra),
+            ask_extra = VALUES(ask_extra),
+            enabled   = VALUES(enabled)
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM t_symbol_group_markup
+        WHERE group_code = #{groupCode}
+          AND platform_symbol = #{platformSymbol}
+    </delete>
+</mapper>

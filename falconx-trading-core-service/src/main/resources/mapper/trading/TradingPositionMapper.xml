@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingPositionMapper">
+
+    <resultMap id="tradingPositionRecordMap" type="com.falconx.trading.repository.mapper.record.TradingPositionRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="opening_order_id" javaType="java.lang.Long"/>
+            <arg column="user_id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="side" javaType="java.lang.Integer"/>
+            <arg column="quantity" javaType="java.math.BigDecimal"/>
+            <arg column="entry_price" javaType="java.math.BigDecimal"/>
+            <arg column="entry_fx_rate" javaType="java.math.BigDecimal"/>
+            <arg column="mm_rate_at_open" javaType="java.math.BigDecimal"/>
+            <arg column="tier_no_at_open" javaType="java.lang.Integer"/>
+            <arg column="leverage" javaType="java.math.BigDecimal"/>
+            <arg column="margin" javaType="java.math.BigDecimal"/>
+            <arg column="margin_mode" javaType="java.lang.Integer"/>
+            <arg column="liquidation_price" javaType="java.math.BigDecimal"/>
+            <arg column="take_profit_price" javaType="java.math.BigDecimal"/>
+            <arg column="stop_loss_price" javaType="java.math.BigDecimal"/>
+            <arg column="close_price" javaType="java.math.BigDecimal"/>
+            <arg column="close_reason" javaType="java.lang.Integer"/>
+            <arg column="realized_pnl" javaType="java.math.BigDecimal"/>
+            <arg column="status" javaType="java.lang.Integer"/>
+            <arg column="open_fee_rate" javaType="java.math.BigDecimal"/>
+            <arg column="group_code_at_open" javaType="java.lang.String"/>
+            <arg column="bid_extra_at_open" javaType="java.math.BigDecimal"/>
+            <arg column="ask_extra_at_open" javaType="java.math.BigDecimal"/>
+            <arg column="opened_at" javaType="java.time.LocalDateTime"/>
+            <arg column="closed_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByOpeningOrderId" resultMap="tradingPositionRecordMap">
+        SELECT id,
+               opening_order_id,
+               user_id,
+               symbol,
+               side,
+               quantity,
+               entry_price,
+               entry_fx_rate,
+               mm_rate_at_open,
+               tier_no_at_open,
+               leverage,
+               margin,
+               margin_mode,
+               liquidation_price,
+               take_profit_price,
+               stop_loss_price,
+               close_price,
+               close_reason,
+               realized_pnl,
+               status,
+               open_fee_rate,
+               group_code_at_open,
+               bid_extra_at_open,
+               ask_extra_at_open,
+               opened_at,
+               closed_at,
+               updated_at
+        FROM t_position
+        WHERE opening_order_id = #{openingOrderId}
+    </select>
+
+    <select id="selectByIdAndUserIdForUpdate" resultMap="tradingPositionRecordMap">
+        SELECT id,
+               opening_order_id,
+               user_id,
+               symbol,
+               side,
+               quantity,
+               entry_price,
+               entry_fx_rate,
+               mm_rate_at_open,
+               tier_no_at_open,
+               leverage,
+               margin,
+               margin_mode,
+               liquidation_price,
+               take_profit_price,
+               stop_loss_price,
+               close_price,
+               close_reason,
+               realized_pnl,
+               status,
+               open_fee_rate,
+               group_code_at_open,
+               bid_extra_at_open,
+               ask_extra_at_open,
+               opened_at,
+               closed_at,
+               updated_at
+        FROM t_position
+        WHERE id = #{positionId}
+          AND user_id = #{userId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="tradingPositionRecordMap">
+        SELECT id,
+               opening_order_id,
+               user_id,
+               symbol,
+               side,
+               quantity,
+               entry_price,
+               entry_fx_rate,
+               mm_rate_at_open,
+               tier_no_at_open,
+               leverage,
+               margin,
+               margin_mode,
+               liquidation_price,
+               take_profit_price,
+               stop_loss_price,
+               close_price,
+               close_reason,
+               realized_pnl,
+               status,
+               open_fee_rate,
+               group_code_at_open,
+               bid_extra_at_open,
+               ask_extra_at_open,
+               opened_at,
+               closed_at,
+               updated_at
+        FROM t_position
+        WHERE id = #{positionId}
+        FOR UPDATE
+    </select>
+
+    <select id="selectOpenByUserId" resultMap="tradingPositionRecordMap">
+        SELECT id,
+               opening_order_id,
+               user_id,
+               symbol,
+               side,
+               quantity,
+               entry_price,
+               entry_fx_rate,
+               mm_rate_at_open,
+               tier_no_at_open,
+               leverage,
+               margin,
+               margin_mode,
+               liquidation_price,
+               take_profit_price,
+               stop_loss_price,
+               close_price,
+               close_reason,
+               realized_pnl,
+               status,
+               open_fee_rate,
+               group_code_at_open,
+               bid_extra_at_open,
+               ask_extra_at_open,
+               opened_at,
+               closed_at,
+               updated_at
+        FROM t_position
+        WHERE user_id = #{userId}
+          AND status = 1
+        ORDER BY opened_at DESC
+    </select>
+
+    <select id="countOpenByUserIdAndSymbol" resultType="long">
+        SELECT COUNT(1)
+        FROM t_position
+        WHERE user_id = #{userId}
+          AND symbol = #{symbol}
+          AND status = 1
+    </select>
+
+    <select id="countOpenBySymbol" resultType="long">
+        SELECT COUNT(1)
+        FROM t_position
+        WHERE symbol = #{symbol}
+          AND status = 1
+    </select>
+
+    <select id="selectAllOpenPositions" resultMap="tradingPositionRecordMap">
+        SELECT id,
+               opening_order_id,
+               user_id,
+               symbol,
+               side,
+               quantity,
+               entry_price,
+               entry_fx_rate,
+               mm_rate_at_open,
+               tier_no_at_open,
+               leverage,
+               margin,
+               margin_mode,
+               liquidation_price,
+               take_profit_price,
+               stop_loss_price,
+               close_price,
+               close_reason,
+               realized_pnl,
+               status,
+               open_fee_rate,
+               group_code_at_open,
+               bid_extra_at_open,
+               ask_extra_at_open,
+               opened_at,
+               closed_at,
+               updated_at
+        FROM t_position
+        WHERE status = 1
+        ORDER BY symbol ASC, opened_at ASC
+    </select>
+
+    <select id="selectByUserIdPaginated" resultMap="tradingPositionRecordMap">
+        SELECT id,
+               opening_order_id,
+               user_id,
+               symbol,
+               side,
+               quantity,
+               entry_price,
+               entry_fx_rate,
+               mm_rate_at_open,
+               tier_no_at_open,
+               leverage,
+               margin,
+               margin_mode,
+               liquidation_price,
+               take_profit_price,
+               stop_loss_price,
+               close_price,
+               close_reason,
+               realized_pnl,
+               status,
+               open_fee_rate,
+               group_code_at_open,
+               bid_extra_at_open,
+               ask_extra_at_open,
+               opened_at,
+               closed_at,
+               updated_at
+        FROM t_position
+        WHERE user_id = #{userId}
+        <if test="statusCodes != null and statusCodes.size() &gt; 0">
+            AND status IN
+            <foreach collection="statusCodes" item="code" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(1)
+        FROM t_position
+        WHERE user_id = #{userId}
+        <if test="statusCodes != null and statusCodes.size() &gt; 0">
+            AND status IN
+            <foreach collection="statusCodes" item="code" open="(" separator="," close=")">
+                #{code}
+            </foreach>
+        </if>
+    </select>
+
+    <select id="selectDistinctUserIdsBySymbolOpen" resultType="long">
+        SELECT DISTINCT user_id
+        FROM t_position
+        WHERE symbol = #{symbol}
+          AND status = 1
+    </select>
+
+    <sql id="positionAdminFilteredWhere">
+        <where>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+            <if test="statusCode != null">AND status = #{statusCode}</if>
+            <if test="fromOpenedAt != null">AND opened_at &gt;= #{fromOpenedAt}</if>
+            <if test="toOpenedAt != null">AND opened_at &lt; #{toOpenedAt}</if>
+        </where>
+    </sql>
+
+    <select id="selectAdminPaginated" resultMap="tradingPositionRecordMap">
+        SELECT id,
+               opening_order_id,
+               user_id,
+               symbol,
+               side,
+               quantity,
+               entry_price,
+               entry_fx_rate,
+               mm_rate_at_open,
+               tier_no_at_open,
+               leverage,
+               margin,
+               margin_mode,
+               liquidation_price,
+               take_profit_price,
+               stop_loss_price,
+               close_price,
+               close_reason,
+               realized_pnl,
+               status,
+               open_fee_rate,
+               group_code_at_open,
+               bid_extra_at_open,
+               ask_extra_at_open,
+               opened_at,
+               closed_at,
+               updated_at
+        FROM t_position
+        <include refid="positionAdminFilteredWhere"/>
+        ORDER BY opened_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminFiltered" resultType="long">
+        SELECT COUNT(1)
+        FROM t_position
+        <include refid="positionAdminFilteredWhere"/>
+    </select>
+
+    <insert id="insertTradingPosition" parameterType="com.falconx.trading.repository.mapper.record.TradingPositionRecord">
+        INSERT INTO t_position (
+            id,
+            opening_order_id,
+            user_id,
+            symbol,
+            side,
+            quantity,
+            entry_price,
+            entry_fx_rate,
+            mm_rate_at_open,
+            tier_no_at_open,
+            leverage,
+            margin,
+            margin_mode,
+            liquidation_price,
+            take_profit_price,
+            stop_loss_price,
+            close_price,
+            close_reason,
+            realized_pnl,
+            status,
+            open_fee_rate,
+            group_code_at_open,
+            bid_extra_at_open,
+            ask_extra_at_open,
+            opened_at,
+            closed_at,
+            updated_at
+        ) VALUES (
+            #{id},
+            #{openingOrderId},
+            #{userId},
+            #{symbol},
+            #{sideCode},
+            #{quantity},
+            #{entryPrice},
+            #{entryFxRate},
+            #{mmRateAtOpen},
+            #{tierNoAtOpen},
+            #{leverage},
+            #{margin},
+            #{marginModeCode},
+            #{liquidationPrice},
+            #{takeProfitPrice},
+            #{stopLossPrice},
+            #{closePrice},
+            #{closeReasonCode},
+            #{realizedPnl},
+            #{statusCode},
+            #{openFeeRate},
+            #{groupCodeAtOpen},
+            #{bidExtraAtOpen},
+            #{askExtraAtOpen},
+            #{openedAt},
+            #{closedAt},
+            #{updatedAt}
+        )
+    </insert>
+
+    <update id="updateTradingPosition" parameterType="com.falconx.trading.repository.mapper.record.TradingPositionRecord">
+        UPDATE t_position
+        SET quantity = #{quantity},
+            entry_price = #{entryPrice},
+            leverage = #{leverage},
+            margin = #{margin},
+            margin_mode = #{marginModeCode},
+            liquidation_price = #{liquidationPrice},
+            take_profit_price = #{takeProfitPrice},
+            stop_loss_price = #{stopLossPrice},
+            close_price = #{closePrice},
+            close_reason = #{closeReasonCode},
+            realized_pnl = #{realizedPnl},
+            status = #{statusCode},
+            open_fee_rate = #{openFeeRate},
+            closed_at = #{closedAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+</mapper>

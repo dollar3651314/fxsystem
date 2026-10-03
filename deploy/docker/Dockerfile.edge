@@ -1,0 +1,4 @@
+# 入口反代 nginx
+FROM nginx:1.27-alpine
+COPY deploy/docker/nginx-edge.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80

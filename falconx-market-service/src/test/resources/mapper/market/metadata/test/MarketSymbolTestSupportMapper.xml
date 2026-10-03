@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.repository.mapper.test.MarketSymbolTestSupportMapper">
+
+    <update id="updateSymbolStatus">
+        UPDATE t_symbol
+        SET status = #{status}
+        WHERE symbol = #{symbol}
+    </update>
+
+    <update id="updateLpSubscribeEnabled">
+        UPDATE t_symbol_quote_mapping
+        SET lp_subscribe_enabled = #{enabled}
+        WHERE platform_symbol = #{platformSymbol}
+    </update>
+
+    <select id="countBlockedSuffixSymbols" resultType="long">
+        SELECT COUNT(*)
+        FROM t_symbol
+        WHERE LOWER(symbol) LIKE '%.p'
+           OR LOWER(symbol) LIKE '%.c'
+           OR LOWER(symbol) LIKE '%.f'
+    </select>
+
+    <select id="countBlockedSuffixGroupVisibility" resultType="long">
+        SELECT COUNT(*)
+        FROM t_symbol_group_visibility
+        WHERE LOWER(symbol) LIKE '%.p'
+           OR LOWER(symbol) LIKE '%.c'
+           OR LOWER(symbol) LIKE '%.f'
+    </select>
+
+    <select id="countBlockedSuffixQuoteMappings" resultType="long">
+        SELECT COUNT(*)
+        FROM t_symbol_quote_mapping
+        WHERE LOWER(platform_symbol) LIKE '%.p'
+           OR LOWER(platform_symbol) LIKE '%.c'
+           OR LOWER(platform_symbol) LIKE '%.f'
+           OR LOWER(source_symbol) LIKE '%.p'
+           OR LOWER(source_symbol) LIKE '%.c'
+           OR LOWER(source_symbol) LIKE '%.f'
+    </select>
+</mapper>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingDepositMapper">
+
+    <resultMap id="tradingDepositRecordMap" type="com.falconx.trading.repository.mapper.record.TradingDepositRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="wallet_tx_id" javaType="java.lang.Long"/>
+            <arg column="user_id" javaType="java.lang.Long"/>
+            <arg column="account_id" javaType="java.lang.Long"/>
+            <arg column="chain" javaType="java.lang.String"/>
+            <arg column="token" javaType="java.lang.String"/>
+            <arg column="tx_hash" javaType="java.lang.String"/>
+            <arg column="amount" javaType="java.math.BigDecimal"/>
+            <arg column="status" javaType="java.lang.Integer"/>
+            <arg column="credited_at" javaType="java.time.LocalDateTime"/>
+            <arg column="reversed_at" javaType="java.time.LocalDateTime"/>
+            <arg column="rejection_reason" javaType="java.lang.String"/>
+            <arg column="rejected_at" javaType="java.time.LocalDateTime"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="depositColumns">
+        id, wallet_tx_id, user_id, account_id, chain, token, tx_hash, amount, status,
+        credited_at, reversed_at, rejection_reason, rejected_at, created_at
+    </sql>
+
+    <select id="selectByWalletTxId" resultMap="tradingDepositRecordMap">
+        SELECT <include refid="depositColumns"/>
+        FROM t_deposit
+        WHERE wallet_tx_id = #{walletTxId}
+    </select>
+
+    <!-- STAGE-11-OBS-RECON §11.4：admin 对账查询，按 chain/token/状态/时间窗过滤。 -->
+    <select id="selectForRecon" resultMap="tradingDepositRecordMap">
+        SELECT <include refid="depositColumns"/>
+        FROM t_deposit
+        <where>
+            <if test="chain != null and chain != ''">
+                AND chain = #{chain}
+            </if>
+            <if test="token != null and token != ''">
+                AND token = #{token}
+            </if>
+            <if test="statusCode != null">
+                AND status = #{statusCode}
+            </if>
+            <if test="fromCreatedAt != null">
+                AND created_at &gt;= #{fromCreatedAt}
+            </if>
+            <if test="toCreatedAt != null">
+                AND created_at &lt;= #{toCreatedAt}
+            </if>
+        </where>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <insert id="insertTradingDeposit" parameterType="com.falconx.trading.repository.mapper.record.TradingDepositRecord">
+        INSERT INTO t_deposit (
+            id, wallet_tx_id, user_id, account_id, chain, token, tx_hash, amount, status,
+            credited_at, reversed_at, rejection_reason, rejected_at, created_at
+        ) VALUES (
+            #{id}, #{walletTxId}, #{userId}, #{accountId}, #{chain}, #{token}, #{txHash}, #{amount},
+            #{statusCode}, #{creditedAt}, #{reversedAt}, #{rejectionReason}, #{rejectedAt}, #{createdAt}
+        )
+    </insert>
+
+    <update id="updateTradingDeposit" parameterType="com.falconx.trading.repository.mapper.record.TradingDepositRecord">
+        UPDATE t_deposit
+        SET wallet_tx_id = #{walletTxId},
+            user_id = #{userId},
+            account_id = #{accountId},
+            token = #{token},
+            amount = #{amount},
+            status = #{statusCode},
+            credited_at = #{creditedAt},
+            reversed_at = #{reversedAt},
+            rejection_reason = #{rejectionReason},
+            rejected_at = #{rejectedAt}
+        WHERE id = #{id}
+    </update>
+</mapper>

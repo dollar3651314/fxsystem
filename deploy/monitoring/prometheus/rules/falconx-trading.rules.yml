@@ -1,0 +1,92 @@
+# FalconX trading-core-service tick 消费告警规则
+# 真源：docs/operations/生产观测与回滚手册.md §2.2 + §2.3（trading WebSocket）
+# 指标类型：worker.queue.total / worker.queue.size / websocket.* = Gauge；
+#           tick.consumer.failures = Counter；
+#           tick.queue.delay / tick.engine.duration / tick.consumer.duration = Timer
+#           （未开 histogram，仅 _seconds_max 可用，作 p95 保守代理 max≥p95，见手册 §6）。
+groups:
+  - name: falconx-trading-tick
+    rules:
+      # 所有 worker 总排队任务数 > 1000 持续 30s。
+      - alert: FalconxTradingTickQueueTotalHigh
+        expr: falconx_trading_tick_worker_queue_total > 1000
+        for: 30s
+        labels:
+          severity: P0
+        annotations:
+          summary: "trading tick worker 总排队积压"
+          description: "falconx_trading_tick_worker_queue_total > 1000 已持续 30 秒，tick 处理跟不上消费速率。"
+
+      # 单 worker 排队任务数 > 500 持续 30s。
+      - alert: FalconxTradingTickWorkerQueueHigh
+        expr: falconx_trading_tick_worker_queue_size > 500
+        for: 30s
+        labels:
+          severity: P2
+        annotations:
+          summary: "trading 单 worker 排队积压：{{ $labels.worker }}"
+          description: "falconx_trading_tick_worker_queue_size{worker={{ $labels.worker }}} > 500 已持续 30 秒。"
+
+      # 排队延迟尾部（_seconds_max 作 p95 代理）> 200ms 持续 5 分钟。
+      - alert: FalconxTradingTickQueueDelaySlow
+        expr: max by (job) (falconx_trading_tick_queue_delay_seconds_max) > 0.2
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "trading tick 排队延迟过高"
+          description: "falconx_trading_tick_queue_delay_seconds_max（p95 保守代理）> 200ms 已持续 5 分钟。"
+
+      # 引擎处理耗时尾部 > 300ms 持续 5 分钟。
+      - alert: FalconxTradingTickEngineSlow
+        expr: max by (job) (falconx_trading_tick_engine_duration_seconds_max) > 0.3
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "trading QuoteDrivenEngine 处理耗时过高"
+          description: "falconx_trading_tick_engine_duration_seconds_max（p95 保守代理）> 300ms 已持续 5 分钟。"
+
+      # 整条 tick 消费耗时尾部 > 500ms 持续 5 分钟。
+      - alert: FalconxTradingTickConsumerSlow
+        expr: max by (job) (falconx_trading_tick_consumer_duration_seconds_max) > 0.5
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "trading tick 消费总耗时过高"
+          description: "falconx_trading_tick_consumer_duration_seconds_max（p95 保守代理）> 500ms 已持续 5 分钟。"
+
+      # tick 消费失败（Counter 5 分钟增量 > 0）。
+      - alert: FalconxTradingTickConsumerFailures
+        expr: increase(falconx_trading_tick_consumer_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "trading tick 消费失败：{{ $labels.symbol }}"
+          description: "falconx_trading_tick_consumer_failures_total 5 分钟窗口增量 > 0（symbol={{ $labels.symbol }} reason={{ $labels.reason }}）。"
+
+  - name: falconx-trading-websocket
+    rules:
+      # 单线程推送 executor 待发送任务 > 1000 持续 30s。
+      - alert: FalconxTradingWebSocketPushQueueHigh
+        expr: falconx_trading_websocket_push_queue_size > 1000
+        for: 30s
+        labels:
+          severity: P1
+        annotations:
+          summary: "trading WebSocket 推送队列积压"
+          description: "falconx_trading_websocket_push_queue_size > 1000 已持续 30 秒，推送线程跟不上事件产出。"
+
+      # 待发送 buffer 接近容量（activeSessions * 512KiB * 0.8）。
+      - alert: FalconxTradingWebSocketBufferHigh
+        expr: |
+          falconx_trading_websocket_buffer_bytes
+            > falconx_trading_websocket_sessions_active * 419430
+        for: 3m
+        labels:
+          severity: P1
+        annotations:
+          summary: "trading WebSocket 待发送 buffer 接近容量"
+          description: "falconx_trading_websocket_buffer_bytes 已超过 activeSessions×512KiB×0.8 持续 3 分钟。"

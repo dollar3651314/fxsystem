@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingHedgeLogMapper">
+
+    <resultMap id="tradingHedgeLogRecordMap" type="com.falconx.trading.repository.mapper.record.TradingHedgeLogRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="position_id" javaType="java.lang.Long"/>
+            <arg column="trigger_source" javaType="int"/>
+            <arg column="action_status" javaType="int"/>
+            <arg column="net_exposure" javaType="java.math.BigDecimal"/>
+            <arg column="net_exposure_usd" javaType="java.math.BigDecimal"/>
+            <arg column="hedge_threshold_usd" javaType="java.math.BigDecimal"/>
+            <arg column="mark_price" javaType="java.math.BigDecimal"/>
+            <arg column="price_ts" javaType="java.time.LocalDateTime"/>
+            <arg column="price_source" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="insertTradingHedgeLog"
+            parameterType="com.falconx.trading.repository.mapper.record.TradingHedgeLogRecord">
+        INSERT INTO t_hedge_log (
+            id,
+            symbol,
+            position_id,
+            trigger_source,
+            action_status,
+            net_exposure,
+            net_exposure_usd,
+            hedge_threshold_usd,
+            mark_price,
+            price_ts,
+            price_source,
+            created_at
+        ) VALUES (
+            #{id},
+            #{symbol},
+            #{positionId},
+            #{triggerSourceCode},
+            #{actionStatusCode},
+            #{netExposure},
+            #{netExposureUsd},
+            #{hedgeThresholdUsd},
+            #{markPrice},
+            #{priceTs},
+            #{priceSource},
+            #{createdAt}
+        )
+    </insert>
+
+    <select id="selectLatestBySymbol" resultMap="tradingHedgeLogRecordMap">
+        SELECT id,
+               symbol,
+               position_id,
+               trigger_source,
+               action_status,
+               net_exposure,
+               net_exposure_usd,
+               hedge_threshold_usd,
+               mark_price,
+               price_ts,
+               price_source,
+               created_at
+        FROM t_hedge_log
+        WHERE symbol = #{symbol}
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    </select>
+</mapper>

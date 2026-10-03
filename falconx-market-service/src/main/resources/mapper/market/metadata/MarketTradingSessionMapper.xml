@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.repository.mapper.MarketTradingSessionMapper">
+
+    <resultMap id="MarketTradingSessionRecordMap" type="com.falconx.market.repository.mapper.record.MarketTradingSessionRecord">
+        <constructor>
+            <arg column="id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="day_of_week" javaType="_int"/>
+            <arg column="session_no" javaType="_int"/>
+            <arg column="open_time" javaType="java.time.LocalTime"/>
+            <arg column="close_time" javaType="java.time.LocalTime"/>
+            <arg column="timezone" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="_boolean"/>
+            <arg column="effective_from" javaType="java.time.LocalDate"/>
+            <arg column="effective_to" javaType="java.time.LocalDate"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectAllEnabled" resultMap="MarketTradingSessionRecordMap">
+        SELECT
+            id,
+            symbol,
+            day_of_week,
+            session_no,
+            open_time,
+            close_time,
+            timezone,
+            enabled,
+            effective_from,
+            effective_to
+        FROM t_trading_hours
+        WHERE enabled = 1
+        ORDER BY symbol ASC, day_of_week ASC, session_no ASC, effective_from ASC
+    </select>
+</mapper>

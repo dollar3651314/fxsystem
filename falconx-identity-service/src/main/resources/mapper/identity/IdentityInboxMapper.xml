@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.identity.repository.mapper.IdentityInboxMapper">
+
+    <select id="countProcessedByEventId" resultType="java.lang.Integer">
+        SELECT COUNT(1)
+        FROM t_inbox
+        WHERE event_id = #{eventId}
+          AND status = 1
+    </select>
+
+    <insert id="insertProcessed" parameterType="com.falconx.identity.repository.mapper.record.IdentityInboxRecord">
+        INSERT INTO t_inbox (
+            id,
+            event_id,
+            event_type,
+            source,
+            payload,
+            status,
+            consumed_at,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{id},
+            #{eventId},
+            #{eventType},
+            #{source},
+            CAST(#{payloadJson} AS JSON),
+            #{statusCode},
+            #{consumedAt},
+            #{createdAt},
+            #{updatedAt}
+        )
+    </insert>
+
+    <!-- 2026-05-26 性能加固：删 done 行 cleanup。与 trading inbox cleanup 同款 LIMIT 防长事务。 -->
+    <delete id="deleteProcessedBefore">
+        DELETE FROM t_inbox
+        WHERE status = 1
+          AND consumed_at IS NOT NULL
+          AND consumed_at &lt; #{cutoff}
+        LIMIT #{limit}
+    </delete>
+</mapper>

@@ -1,0 +1,7 @@
+interface:
+  display_name: "FalconX 架构复刻"
+  short_description: "复刻当前 FalconX v1 GODSA 后端架构"
+  default_prompt: "使用 $falconx-replicate-architecture 按当前仓库事实复刻 FalconX v1 的模块、服务、存储与事件架构。"
+
+policy:
+  allow_implicit_invocation: true

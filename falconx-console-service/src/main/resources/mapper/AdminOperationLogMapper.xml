@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.console.repository.mapper.AdminOperationLogMapper">
+
+    <resultMap id="recordMap" type="com.falconx.console.repository.mapper.record.AdminOperationLogRecord">
+        <constructor>
+            <idArg column="id"             javaType="java.lang.Long"/>
+            <arg   column="admin_user_id"  javaType="java.lang.Long"/>
+            <arg   column="permission_code" javaType="java.lang.String"/>
+            <arg   column="target_type"    javaType="java.lang.String"/>
+            <arg   column="target_id"      javaType="java.lang.String"/>
+            <arg   column="before_value"   javaType="java.lang.String"/>
+            <arg   column="after_value"    javaType="java.lang.String"/>
+            <arg   column="risk_level"     javaType="java.lang.String"/>
+            <arg   column="ip"             javaType="java.lang.String"/>
+            <arg   column="user_agent"     javaType="java.lang.String"/>
+            <arg   column="occurred_at"    javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="cols">
+        id, admin_user_id, permission_code, target_type, target_id,
+        before_value, after_value, risk_level, ip, user_agent, occurred_at
+    </sql>
+
+    <insert id="insert">
+        INSERT INTO t_admin_operation_log (<include refid="cols"/>) VALUES (
+            #{record.id}, #{record.adminUserId}, #{record.permissionCode},
+            #{record.targetType}, #{record.targetId},
+            #{record.beforeValue}, #{record.afterValue},
+            #{record.riskLevel}, #{record.ip}, #{record.userAgent}, #{record.occurredAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_admin_operation_log WHERE id = #{id}
+    </select>
+
+    <select id="selectByFilters" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_admin_operation_log
+        WHERE 1 = 1
+        <if test="adminUserId != null">AND admin_user_id = #{adminUserId}</if>
+        <if test="permissionCode != null">AND permission_code = #{permissionCode}</if>
+        <if test="targetType != null">AND target_type = #{targetType}</if>
+        <if test="targetId != null">AND target_id = #{targetId}</if>
+        <if test="riskLevel != null">AND risk_level = #{riskLevel}</if>
+        <if test="fromOccurredAt != null">AND occurred_at &gt;= #{fromOccurredAt}</if>
+        <if test="toOccurredAt != null">AND occurred_at &lt; #{toOccurredAt}</if>
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByFilters" resultType="long">
+        SELECT COUNT(1) FROM t_admin_operation_log
+        WHERE 1 = 1
+        <if test="adminUserId != null">AND admin_user_id = #{adminUserId}</if>
+        <if test="permissionCode != null">AND permission_code = #{permissionCode}</if>
+        <if test="targetType != null">AND target_type = #{targetType}</if>
+        <if test="targetId != null">AND target_id = #{targetId}</if>
+        <if test="riskLevel != null">AND risk_level = #{riskLevel}</if>
+        <if test="fromOccurredAt != null">AND occurred_at &gt;= #{fromOccurredAt}</if>
+        <if test="toOccurredAt != null">AND occurred_at &lt; #{toOccurredAt}</if>
+    </select>
+
+</mapper>

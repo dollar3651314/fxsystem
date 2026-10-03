@@ -1,0 +1,9 @@
+falconx:
+  market:
+    lp:
+      enabled: false
+    # 2026-05-26 Sprint 3 S5：测试场景下走同步路径，避免 ingest() 返回后下游写还在队列里
+    # 导致 SpringBootTest 集成断言（如 countKlineBySymbolAndInterval）失败。
+    ingestion:
+      async-downstream:
+        enabled: false

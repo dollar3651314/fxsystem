@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.console.repository.mapper.AdminWithdrawEnrichmentMapper">
+
+    <resultMap id="adminWithdrawEnrichmentMap"
+               type="com.falconx.console.repository.mapper.record.AdminWithdrawEnrichmentRecord">
+        <constructor>
+            <idArg column="user_id" javaType="java.lang.Long"/>
+            <arg column="email" javaType="java.lang.String"/>
+            <arg column="kyc_level" javaType="java.lang.Integer"/>
+            <arg column="daily_accumulated_usd" javaType="java.math.BigDecimal"/>
+        </constructor>
+    </resultMap>
+
+    <!--
+      跨 schema 单查：
+      - identity 端拿 email / kyc_level（u.id IN (userIds)）
+      - trading 端子查询当日累计（COOLING(0)..COMPLETED(5)，与 sumActiveAmountForUserOnDay 一致）
+        子查询用 GROUP BY user_id 保证一个用户一行；COALESCE 让无出金的用户也有 0 行而非缺失。
+    -->
+    <select id="selectEnrichmentByUserIds" resultMap="adminWithdrawEnrichmentMap">
+        SELECT
+            u.id AS user_id,
+            u.email,
+            u.kyc_level,
+            COALESCE(d.daily_sum, 0) AS daily_accumulated_usd
+        FROM falconx_identity.t_user u
+        LEFT JOIN (
+            SELECT user_id, SUM(amount) AS daily_sum
+            FROM falconx_trading.t_withdraw_order
+            WHERE user_id IN
+                <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                    #{uid}
+                </foreach>
+              AND created_at &gt;= #{dayStartUtc}
+              AND created_at &lt; #{dayEndUtc}
+              AND status IN (0, 1, 2, 3, 4, 5)
+            GROUP BY user_id
+        ) d ON d.user_id = u.id
+        WHERE u.id IN
+            <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                #{uid}
+            </foreach>
+    </select>
+</mapper>

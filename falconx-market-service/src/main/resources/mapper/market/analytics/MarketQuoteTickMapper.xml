@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.analytics.mapper.MarketQuoteTickMapper">
+
+    <insert id="insertQuoteTick" parameterType="com.falconx.market.analytics.mapper.record.MarketQuoteTickRecord">
+        INSERT INTO falconx_market_analytics.quote_tick (
+            symbol,
+            source,
+            bid_price,
+            ask_price,
+            mid_price,
+            mark_price,
+            event_time
+        ) VALUES (
+            #{symbol},
+            #{source},
+            #{bidPrice},
+            #{askPrice},
+            #{midPrice},
+            #{markPrice},
+            fromUnixTimestamp64Milli(#{eventTimeEpochMillis}, 'UTC')
+        )
+    </insert>
+
+    <insert id="insertQuoteTicks">
+        INSERT INTO falconx_market_analytics.quote_tick (
+            symbol,
+            source,
+            bid_price,
+            ask_price,
+            mid_price,
+            mark_price,
+            event_time
+        ) VALUES
+        <foreach collection="list" item="record" separator=",">
+            (
+                #{record.symbol},
+                #{record.source},
+                #{record.bidPrice},
+                #{record.askPrice},
+                #{record.midPrice},
+                #{record.markPrice},
+                fromUnixTimestamp64Milli(#{record.eventTimeEpochMillis}, 'UTC')
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectLatestBySymbol" resultType="com.falconx.market.analytics.mapper.record.MarketQuoteTickRecord">
+        SELECT
+            symbol,
+            source,
+            bid_price AS bidPrice,
+            ask_price AS askPrice,
+            mid_price AS midPrice,
+            mark_price AS markPrice,
+            event_time AS eventTime
+        FROM falconx_market_analytics.quote_tick
+        WHERE symbol = #{symbol}
+        ORDER BY event_time DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectRecentBySymbol" resultType="com.falconx.market.analytics.mapper.record.MarketQuoteTickRecord">
+        SELECT
+            symbol,
+            source,
+            bidPrice,
+            askPrice,
+            midPrice,
+            markPrice,
+            eventTime
+        FROM (
+            SELECT
+                symbol,
+                source,
+                bid_price AS bidPrice,
+                ask_price AS askPrice,
+                mid_price AS midPrice,
+                mark_price AS markPrice,
+                event_time AS eventTime
+            FROM falconx_market_analytics.quote_tick
+            WHERE symbol = #{symbol}
+            ORDER BY event_time DESC
+            LIMIT #{limit}
+        )
+        ORDER BY eventTime ASC
+    </select>
+
+    <!-- STAGE-2-SYMBOL-PARAMS-DOWNSHIFT R4.1.B: 一次性拿一组 symbol 的最新 tick 时间。
+         没有 tick 的 symbol 不会出现在结果中。 -->
+    <select id="selectLastTickBySymbols" resultType="com.falconx.market.repository.mapper.record.SymbolLastTickRecord">
+        SELECT
+            symbol,
+            max(event_time) AS lastTickAt
+        FROM falconx_market_analytics.quote_tick
+        WHERE symbol IN
+        <foreach collection="symbols" item="s" open="(" separator="," close=")">
+            #{s}
+        </foreach>
+        GROUP BY symbol
+    </select>
+</mapper>

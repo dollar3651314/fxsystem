@@ -1,0 +1,19 @@
+<clickhouse>
+  <users>
+    <default>
+      <!--
+        STAGE-12 安全：之前 ::/0 + 0.0.0.0/0 允许任何 IP 接入。
+        改为只允许本机 + Docker bridge 网段。生产应通过 CLICKHOUSE_TRUSTED_NETWORKS 注入。
+
+        如需调试需要从其他 IP 接入：临时把 IP 加到 networks，不要恢复 0.0.0.0/0。
+      -->
+      <networks>
+        <ip>::1</ip>
+        <ip>127.0.0.1</ip>
+        <ip>172.16.0.0/12</ip>  <!-- Docker default bridge range -->
+        <ip>10.0.0.0/8</ip>     <!-- Docker overlay / Kubernetes pod -->
+      </networks>
+      <password>falconx</password>
+    </default>
+  </users>
+</clickhouse>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingRiskSwitchMapper">
+
+    <resultMap id="tradingRiskSwitchRecordMap" type="com.falconx.trading.repository.mapper.record.TradingRiskSwitchRecord">
+        <constructor>
+            <idArg column="switch_key" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="java.lang.Integer"/>
+            <arg column="reason" javaType="java.lang.String"/>
+            <arg column="updated_by" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByKey" resultMap="tradingRiskSwitchRecordMap">
+        SELECT switch_key, enabled, reason, updated_by, created_at, updated_at
+        FROM t_trading_risk_switch
+        WHERE switch_key = #{switchKey}
+    </select>
+
+    <select id="selectAll" resultMap="tradingRiskSwitchRecordMap">
+        SELECT switch_key, enabled, reason, updated_by, created_at, updated_at
+        FROM t_trading_risk_switch
+        ORDER BY switch_key ASC
+    </select>
+
+    <insert id="upsert" parameterType="com.falconx.trading.repository.mapper.record.TradingRiskSwitchRecord">
+        INSERT INTO t_trading_risk_switch (switch_key, enabled, reason, updated_by, created_at, updated_at)
+        VALUES (#{switchKey}, #{enabled}, #{reason}, #{updatedBy}, #{createdAt}, #{updatedAt})
+        ON DUPLICATE KEY UPDATE
+            enabled = VALUES(enabled),
+            reason = VALUES(reason),
+            updated_by = VALUES(updated_by),
+            updated_at = VALUES(updated_at)
+    </insert>
+</mapper>

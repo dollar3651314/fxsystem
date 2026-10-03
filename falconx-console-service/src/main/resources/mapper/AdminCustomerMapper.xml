@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.console.repository.mapper.AdminCustomerMapper">
+
+    <resultMap id="adminCustomerRecordMap" type="com.falconx.console.repository.mapper.record.AdminCustomerRecord">
+        <constructor>
+            <idArg column="user_id" javaType="java.lang.Long"/>
+            <arg column="uid" javaType="java.lang.String"/>
+            <arg column="email" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.Integer"/>
+            <arg column="email_verified" javaType="java.lang.Integer"/>
+            <arg column="group_code" javaType="java.lang.String"/>
+            <arg column="balance" javaType="java.math.BigDecimal"/>
+            <arg column="frozen" javaType="java.math.BigDecimal"/>
+            <arg column="margin_used" javaType="java.math.BigDecimal"/>
+            <arg column="activated_at" javaType="java.time.LocalDateTime"/>
+            <arg column="last_login_at" javaType="java.time.LocalDateTime"/>
+            <arg column="last_login_ip" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="kyc_level" javaType="java.lang.Integer"/>
+            <arg column="first_name" javaType="java.lang.String"/>
+            <arg column="last_name" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="customerJoinColumns">
+        u.id AS user_id,
+        u.uid,
+        u.email,
+        u.status,
+        u.email_verified,
+        u.group_code,
+        a.balance,
+        a.frozen,
+        a.margin_used,
+        u.activated_at,
+        u.last_login_at,
+        NULL AS last_login_ip,
+        u.created_at,
+        u.kyc_level,
+        p.first_name,
+        p.last_name
+    </sql>
+
+    <sql id="customerJoinFrom">
+        FROM falconx_identity.t_user u
+        LEFT JOIN falconx_trading.t_account a
+            ON a.user_id = u.id AND a.currency = 'USDT'
+        LEFT JOIN falconx_identity.t_user_profile p
+            ON p.user_id = u.id
+    </sql>
+
+    <sql id="customerWhereFilters">
+        <where>
+            <if test="emailLike != null and emailLike != ''">
+                AND u.email LIKE #{emailLike}
+            </if>
+            <if test="statusCodes != null and statusCodes.size() > 0">
+                AND u.status IN
+                <foreach collection="statusCodes" item="code" open="(" separator="," close=")">
+                    #{code}
+                </foreach>
+            </if>
+            <if test="fromCreatedAt != null">
+                AND u.created_at &gt;= #{fromCreatedAt}
+            </if>
+            <if test="toCreatedAt != null">
+                AND u.created_at &lt; #{toCreatedAt}
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectCustomers" resultMap="adminCustomerRecordMap">
+        SELECT <include refid="customerJoinColumns"/>
+        <include refid="customerJoinFrom"/>
+        <include refid="customerWhereFilters"/>
+        ORDER BY u.created_at DESC, u.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countCustomers" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        <include refid="customerJoinFrom"/>
+        <include refid="customerWhereFilters"/>
+    </select>
+
+    <select id="selectCustomerById" resultMap="adminCustomerRecordMap">
+        SELECT <include refid="customerJoinColumns"/>
+        <include refid="customerJoinFrom"/>
+        WHERE u.id = #{userId}
+        LIMIT 1
+    </select>
+
+    <!-- STAGE-1B-USER-PROFILE：单查 profile 行（detail 路径专用，跨 schema） -->
+    <resultMap id="adminCustomerProfileRecordMap" type="com.falconx.console.repository.mapper.record.AdminCustomerProfileRecord">
+        <constructor>
+            <idArg column="user_id" javaType="java.lang.Long"/>
+            <arg column="first_name" javaType="java.lang.String"/>
+            <arg column="middle_name" javaType="java.lang.String"/>
+            <arg column="last_name" javaType="java.lang.String"/>
+            <arg column="birth_date" javaType="java.time.LocalDate"/>
+            <arg column="nationality" javaType="java.lang.String"/>
+            <arg column="gender" javaType="java.lang.Integer"/>
+            <arg column="residence_country" javaType="java.lang.String"/>
+            <arg column="residence_state" javaType="java.lang.String"/>
+            <arg column="residence_city" javaType="java.lang.String"/>
+            <arg column="residence_address" javaType="java.lang.String"/>
+            <arg column="residence_postal_code" javaType="java.lang.String"/>
+            <arg column="phone_country_code" javaType="java.lang.String"/>
+            <arg column="phone_number" javaType="java.lang.String"/>
+            <arg column="language_preference" javaType="java.lang.String"/>
+            <arg column="timezone" javaType="java.lang.String"/>
+            <arg column="profile_verified" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectCustomerProfileById" resultMap="adminCustomerProfileRecordMap">
+        SELECT user_id, first_name, middle_name, last_name, birth_date, nationality,
+               gender, residence_country, residence_state, residence_city,
+               residence_address, residence_postal_code, phone_country_code, phone_number,
+               language_preference, timezone, profile_verified
+        FROM falconx_identity.t_user_profile
+        WHERE user_id = #{userId}
+    </select>
+
+</mapper>

@@ -1,0 +1,46 @@
+# FalconX Alertmanager 路由骨架
+# 按 severity（P0/P1/P2，对齐 docs/operations/生产观测与回滚手册.md §3）分级路由。
+# 🔴 接收器 webhook/email/钉钉 等真实地址与凭据不得写入本文件（Secret 治理见手册 §6）；
+#    生产部署时以环境变量 / 外部 secret 注入，本文件仅保留可校验的路由结构与占位 receiver。
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by: ["alertname", "job"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # P0：5 分钟内必须确认是否降级 / 回滚。
+    - matchers:
+        - severity = "P0"
+      receiver: p0-critical
+      group_wait: 0s
+      repeat_interval: 30m
+    # P1：15 分钟内定位依赖 / 扩容。
+    - matchers:
+        - severity = "P1"
+      receiver: p1-major
+      repeat_interval: 1h
+    # P2：当班处理。
+    - matchers:
+        - severity = "P2"
+      receiver: p2-warning
+      repeat_interval: 6h
+
+receivers:
+  # 占位 receiver（本地验证只在 Alertmanager UI / API 观察分组路由，不外发）。
+  # 生产：把对应 receiver 改为 webhook_configs / email_configs / 第三方集成，凭据用外部注入。
+  - name: default
+  - name: p0-critical
+  - name: p1-major
+  - name: p2-warning
+
+inhibit_rules:
+  # 同一 job 触发 P0 时，抑制其 P1/P2 噪声告警。
+  - source_matchers:
+      - severity = "P0"
+    target_matchers:
+      - severity =~ "P1|P2"
+    equal: ["job"]

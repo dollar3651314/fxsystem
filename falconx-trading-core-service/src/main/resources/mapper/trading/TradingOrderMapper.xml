@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingOrderMapper">
+
+    <resultMap id="tradingOrderRecordMap" type="com.falconx.trading.repository.mapper.record.TradingOrderRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="order_no" javaType="java.lang.String"/>
+            <arg column="user_id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="side" javaType="java.lang.Integer"/>
+            <arg column="order_type" javaType="java.lang.Integer"/>
+            <arg column="quantity" javaType="java.math.BigDecimal"/>
+            <arg column="requested_price" javaType="java.math.BigDecimal"/>
+            <arg column="filled_price" javaType="java.math.BigDecimal"/>
+            <arg column="leverage" javaType="java.math.BigDecimal"/>
+            <arg column="margin" javaType="java.math.BigDecimal"/>
+            <arg column="fee" javaType="java.math.BigDecimal"/>
+            <arg column="open_fee_rate" javaType="java.math.BigDecimal"/>
+            <arg column="client_order_id" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.Integer"/>
+            <arg column="reject_reason" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByUserIdAndClientOrderId" resultMap="tradingOrderRecordMap">
+        SELECT id,
+               order_no,
+               user_id,
+               symbol,
+               side,
+               order_type,
+               quantity,
+               requested_price,
+               filled_price,
+               leverage,
+               margin,
+               fee,
+               open_fee_rate,
+               client_order_id,
+               status,
+               reject_reason,
+               created_at,
+               updated_at
+        FROM t_order
+        WHERE user_id = #{userId}
+          AND client_order_id = #{clientOrderId}
+    </select>
+
+    <select id="selectByUserIdPaginated" resultMap="tradingOrderRecordMap">
+        SELECT id,
+               order_no,
+               user_id,
+               symbol,
+               side,
+               order_type,
+               quantity,
+               requested_price,
+               filled_price,
+               leverage,
+               margin,
+               fee,
+               open_fee_rate,
+               client_order_id,
+               status,
+               reject_reason,
+               created_at,
+               updated_at
+        FROM t_order
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(1)
+        FROM t_order
+        WHERE user_id = #{userId}
+    </select>
+
+    <sql id="adminFilteredWhere">
+        <where>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+            <if test="statusCode != null">AND status = #{statusCode}</if>
+            <if test="fromCreatedAt != null">AND created_at &gt;= #{fromCreatedAt}</if>
+            <if test="toCreatedAt != null">AND created_at &lt; #{toCreatedAt}</if>
+        </where>
+    </sql>
+
+    <select id="selectAdminPaginated" resultMap="tradingOrderRecordMap">
+        SELECT id,
+               order_no,
+               user_id,
+               symbol,
+               side,
+               order_type,
+               quantity,
+               requested_price,
+               filled_price,
+               leverage,
+               margin,
+               fee,
+               open_fee_rate,
+               client_order_id,
+               status,
+               reject_reason,
+               created_at,
+               updated_at
+        FROM t_order
+        <include refid="adminFilteredWhere"/>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminFiltered" resultType="long">
+        SELECT COUNT(1)
+        FROM t_order
+        <include refid="adminFilteredWhere"/>
+    </select>
+
+    <insert id="insertTradingOrder" parameterType="com.falconx.trading.repository.mapper.record.TradingOrderRecord">
+        INSERT INTO t_order (
+            id,
+            order_no,
+            user_id,
+            symbol,
+            side,
+            order_type,
+            quantity,
+            requested_price,
+            filled_price,
+            leverage,
+            margin,
+            fee,
+            open_fee_rate,
+            client_order_id,
+            status,
+            reject_reason,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{id},
+            #{orderNo},
+            #{userId},
+            #{symbol},
+            #{sideCode},
+            #{orderTypeCode},
+            #{quantity},
+            #{requestedPrice},
+            #{filledPrice},
+            #{leverage},
+            #{margin},
+            #{fee},
+            #{openFeeRate},
+            #{clientOrderId},
+            #{statusCode},
+            #{rejectReason},
+            #{createdAt},
+            #{updatedAt}
+        )
+    </insert>
+
+    <update id="updateTradingOrder" parameterType="com.falconx.trading.repository.mapper.record.TradingOrderRecord">
+        UPDATE t_order
+        SET requested_price = #{requestedPrice},
+            filled_price = #{filledPrice},
+            leverage = #{leverage},
+            margin = #{margin},
+            fee = #{fee},
+            open_fee_rate = #{openFeeRate},
+            status = #{statusCode},
+            reject_reason = #{rejectReason},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+</mapper>

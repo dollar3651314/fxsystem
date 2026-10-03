@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingPriceAlertMapper">
+
+    <resultMap id="recordMap" type="com.falconx.trading.repository.mapper.record.TradingPriceAlertRecord">
+        <constructor>
+            <idArg column="id"                  javaType="java.lang.Long"/>
+            <arg   column="user_id"             javaType="java.lang.Long"/>
+            <arg   column="symbol"              javaType="java.lang.String"/>
+            <arg   column="direction"           javaType="java.lang.Integer"/>
+            <arg   column="target_price"        javaType="java.math.BigDecimal"/>
+            <arg   column="status"              javaType="java.lang.Integer"/>
+            <arg   column="note"                javaType="java.lang.String"/>
+            <arg   column="base_price"          javaType="java.math.BigDecimal"/>
+            <arg   column="trigger_count"       javaType="java.lang.Integer"/>
+            <arg   column="last_triggered_at"   javaType="java.time.LocalDateTime"/>
+            <arg   column="last_triggered_price" javaType="java.math.BigDecimal"/>
+            <arg   column="cancelled_at"        javaType="java.time.LocalDateTime"/>
+            <arg   column="cancel_source"       javaType="java.lang.String"/>
+            <arg   column="created_at"          javaType="java.time.LocalDateTime"/>
+            <arg   column="updated_at"          javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="cols">
+        id, user_id, symbol, direction, target_price, status, note, base_price,
+        trigger_count, last_triggered_at, last_triggered_price,
+        cancelled_at, cancel_source, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.falconx.trading.repository.mapper.record.TradingPriceAlertRecord">
+        INSERT INTO t_price_alert (<include refid="cols"/>) VALUES (
+            #{id}, #{userId}, #{symbol}, #{direction}, #{targetPrice}, #{status}, #{note}, #{basePrice},
+            #{triggerCount}, #{lastTriggeredAt}, #{lastTriggeredPrice},
+            #{cancelledAt}, #{cancelSource}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_price_alert WHERE id = #{id}
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_price_alert WHERE id = #{id} FOR UPDATE
+    </select>
+
+    <!-- 触发引擎扫描：ACTIVE + (从未触发过 OR 距上次 ≥ 5 分钟) -->
+    <select id="selectTriggerableBySymbol" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_price_alert
+        WHERE symbol = #{symbol}
+          AND status = 1
+          AND (last_triggered_at IS NULL OR last_triggered_at &lt;= DATE_SUB(#{now}, INTERVAL 5 MINUTE))
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectActiveSymbols" resultType="string">
+        SELECT DISTINCT symbol
+        FROM t_price_alert
+        WHERE status = 1
+    </select>
+
+    <select id="selectByUserId" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_price_alert
+        WHERE user_id = #{userId}
+        <if test="status != null">AND status = #{status}</if>
+        <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(1) FROM t_price_alert
+        WHERE user_id = #{userId}
+        <if test="status != null">AND status = #{status}</if>
+        <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+    </select>
+
+    <select id="countActiveByUserId" resultType="int">
+        SELECT COUNT(1) FROM t_price_alert WHERE user_id = #{userId} AND status = 1
+    </select>
+
+    <select id="countActiveBySymbol" resultType="long">
+        SELECT COUNT(1) FROM t_price_alert WHERE symbol = #{symbol} AND status = 1
+    </select>
+
+    <select id="selectAdminPaginated" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_price_alert
+        <where>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+            <if test="status != null">AND status = #{status}</if>
+        </where>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminFiltered" resultType="long">
+        SELECT COUNT(1) FROM t_price_alert
+        <where>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+            <if test="status != null">AND status = #{status}</if>
+        </where>
+    </select>
+
+    <!-- 触发 CAS：trigger_count 必须等于 expectedTriggerCount 才更新；
+         同时保证 status 仍 ACTIVE 才允许递增 -->
+    <update id="incrementTriggerAtomic">
+        UPDATE t_price_alert
+        SET trigger_count        = #{nextTriggerCount},
+            status               = #{nextStatus},
+            last_triggered_at    = #{lastTriggeredAt},
+            last_triggered_price = #{lastTriggeredPrice},
+            updated_at           = #{updatedAt}
+        WHERE id = #{id}
+          AND status = 1
+          AND trigger_count = #{expectedTriggerCount}
+    </update>
+
+    <update id="markCancelledAtomic">
+        UPDATE t_price_alert
+        SET status        = #{nextStatus},
+            cancel_source = #{cancelSource},
+            cancelled_at  = #{cancelledAt},
+            updated_at    = #{updatedAt}
+        WHERE id = #{id} AND status = 1
+    </update>
+
+</mapper>

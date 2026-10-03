@@ -1,0 +1,152 @@
+# promtool 单测：falconx-market.rules.yml
+rule_files:
+  - falconx-market.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # FalconxMarketQuotePendingHigh：pending/queue_max ≥0.8 持续 30s 触发。
+  - interval: 30s
+    input_series:
+      - series: 'falconx_market_quote_pending_size{service="market", job="falconx-market"}'
+        values: "850 850 850"
+      - series: 'falconx_market_quote_queue_max{service="market", job="falconx-market"}'
+        values: "1000 1000 1000"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxMarketQuotePendingHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P0
+              service: market
+              job: falconx-market
+            exp_annotations:
+              summary: "market quote 待 flush 队列水位过高"
+              description: "falconx_market_quote_pending_size / queue_max ≥ 0.8 已持续 30 秒，ClickHouse 写入慢于 LP push，即将触发 drop-oldest。"
+
+  # 水位 0.5 不触发。
+  - interval: 30s
+    input_series:
+      - series: 'falconx_market_quote_pending_size{service="market"}'
+        values: "500 500 500"
+      - series: 'falconx_market_quote_queue_max{service="market"}'
+        values: "1000 1000 1000"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxMarketQuotePendingHigh
+        exp_alerts: []
+
+  # FalconxMarketQuoteDropped：dropped.total 5m 窗口增量 >0 触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_market_quote_dropped_total{service="market", job="falconx-market"}'
+        values: "0 0 0 0 0 12"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: FalconxMarketQuoteDropped
+        exp_alerts:
+          - exp_labels:
+              severity: P0
+              service: market
+              job: falconx-market
+            exp_annotations:
+              summary: "market 正在丢弃 quote tick"
+              description: "falconx_market_quote_dropped_total 5 分钟窗口增量 > 0，确实在丢数据；排查 ClickHouse 写入吞吐。"
+
+  # 无新增丢弃（恒为 0）不触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_market_quote_dropped_total{service="market"}'
+        values: "0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: FalconxMarketQuoteDropped
+        exp_alerts: []
+
+  # FalconxMarketKafkaPublishSlow：histogram p95 >0.5 持续 5m 触发。
+  # 桶累计每分钟 +：le0.5 +5、le1 +95、le2 +100、+Inf +100 → 95% 落在 (0.5,1.0] → p95≈1.0 >0.5。
+  # rate[5m] + for:5m 需约 10m 数据方能满足「持续 5 分钟」，故给 11 个采样点并在 10m 求值。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_market_kafka_publish_duration_seconds_bucket{job="falconx-market", topic="falconx.market.price.tick", le="0.5"}'
+        values: "0+5x10"
+      - series: 'falconx_market_kafka_publish_duration_seconds_bucket{job="falconx-market", topic="falconx.market.price.tick", le="1.0"}'
+        values: "0+95x10"
+      - series: 'falconx_market_kafka_publish_duration_seconds_bucket{job="falconx-market", topic="falconx.market.price.tick", le="2.0"}'
+        values: "0+100x10"
+      - series: 'falconx_market_kafka_publish_duration_seconds_bucket{job="falconx-market", topic="falconx.market.price.tick", le="+Inf"}'
+        values: "0+100x10"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: FalconxMarketKafkaPublishSlow
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              job: falconx-market
+              topic: falconx.market.price.tick
+            exp_annotations:
+              summary: "market Kafka 发布 p95 延迟过高：falconx.market.price.tick"
+              description: "falconx_market_kafka_publish_duration p95（histogram_quantile）> 500ms 已持续 5 分钟（topic=falconx.market.price.tick）。"
+
+  # 全部 ≤0.5s（p95 落首桶）不触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_market_kafka_publish_duration_seconds_bucket{job="falconx-market", topic="falconx.market.price.tick", le="0.5"}'
+        values: "0+100x10"
+      - series: 'falconx_market_kafka_publish_duration_seconds_bucket{job="falconx-market", topic="falconx.market.price.tick", le="1.0"}'
+        values: "0+100x10"
+      - series: 'falconx_market_kafka_publish_duration_seconds_bucket{job="falconx-market", topic="falconx.market.price.tick", le="+Inf"}'
+        values: "0+100x10"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: FalconxMarketKafkaPublishSlow
+        exp_alerts: []
+
+  # FalconxMarketKafkaPublishFailures：Counter 5m 增量 >0 触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_market_kafka_publish_failures_total{job="falconx-market", topic="falconx.market.price.tick", eventType="PRICE_TICK"}'
+        values: "0 0 0 0 0 3"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: FalconxMarketKafkaPublishFailures
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              job: falconx-market
+              topic: falconx.market.price.tick
+              eventType: PRICE_TICK
+            exp_annotations:
+              summary: "market Kafka 发布失败：falconx.market.price.tick"
+              description: "falconx_market_kafka_publish_failures_total 5 分钟窗口增量 > 0（topic=falconx.market.price.tick）。"
+
+  # FalconxMarketWebSocketBufferHigh：buffer > sessions*419430 持续 3m 触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_market_websocket_buffer_bytes{service="market", job="falconx-market"}'
+        values: "500000000 500000000 500000000 500000000"
+      - series: 'falconx_market_websocket_sessions_active{service="market", job="falconx-market"}'
+        values: "100 100 100 100"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: FalconxMarketWebSocketBufferHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              service: market
+              job: falconx-market
+            exp_annotations:
+              summary: "market WebSocket 待发送 buffer 接近容量"
+              description: "falconx_market_websocket_buffer_bytes 已超过 activeSessions×512KiB×0.8 持续 3 分钟，下游消费慢或会话堆积。"
+
+  # buffer 远低于容量水位不触发（100 会话×419430=41.9MB，buffer 仅 1MB）。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_market_websocket_buffer_bytes{service="market"}'
+        values: "1000000 1000000 1000000 1000000"
+      - series: 'falconx_market_websocket_sessions_active{service="market"}'
+        values: "100 100 100 100"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: FalconxMarketWebSocketBufferHigh
+        exp_alerts: []

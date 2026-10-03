@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.identity.repository.mapper.IdentityUserMapper">
+
+    <resultMap id="identityUserRecordMap" type="com.falconx.identity.repository.mapper.record.IdentityUserRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="uid" javaType="java.lang.String"/>
+            <arg column="email" javaType="java.lang.String"/>
+            <arg column="password_hash" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.Integer"/>
+            <arg column="group_code" javaType="java.lang.String"/>
+            <arg column="email_verified" javaType="java.lang.Integer"/>
+            <arg column="activated_at" javaType="java.time.LocalDateTime"/>
+            <arg column="last_login_at" javaType="java.time.LocalDateTime"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByEmail" resultMap="identityUserRecordMap">
+        SELECT id, uid, email, password_hash, status, group_code, email_verified, activated_at, last_login_at, created_at, updated_at
+        FROM t_user
+        WHERE email = #{email}
+    </select>
+
+    <select id="selectById" resultMap="identityUserRecordMap">
+        SELECT id, uid, email, password_hash, status, group_code, email_verified, activated_at, last_login_at, created_at, updated_at
+        FROM t_user
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insertIdentityUser" parameterType="com.falconx.identity.repository.mapper.record.IdentityUserRecord">
+        INSERT INTO t_user (
+            id,
+            uid,
+            email,
+            password_hash,
+            status,
+            group_code,
+            email_verified,
+            activated_at,
+            last_login_at,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{id},
+            #{uid},
+            #{email},
+            #{passwordHash},
+            #{statusCode},
+            #{groupCode},
+            #{emailVerified},
+            #{activatedAt},
+            #{lastLoginAt},
+            #{createdAt},
+            #{updatedAt}
+        )
+    </insert>
+
+    <update id="updateIdentityUser" parameterType="com.falconx.identity.repository.mapper.record.IdentityUserRecord">
+        UPDATE t_user
+        SET email = #{email},
+            password_hash = #{passwordHash},
+            status = #{statusCode},
+            group_code = #{groupCode},
+            email_verified = #{emailVerified},
+            activated_at = #{activatedAt},
+            last_login_at = #{lastLoginAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <!-- STAGE-7-WITHDRAW：供 trading-core 出金前置校验 -->
+    <select id="selectKycLevelById" resultType="java.lang.Integer">
+        SELECT kyc_level FROM t_user WHERE id = #{id}
+    </select>
+
+    <!--
+      管理端 patch 用户元数据（email / email_verified / group_code / kyc_level / status）。
+      所有参数允许 null，COALESCE 表示保留原值。
+      updated_at 由 ON UPDATE 触发器自动维护。
+    -->
+    <update id="updateAdminFields">
+        UPDATE t_user
+        SET email          = COALESCE(#{email}, email),
+            email_verified = COALESCE(#{emailVerified}, email_verified),
+            group_code     = COALESCE(#{groupCode}, group_code),
+            kyc_level      = COALESCE(#{kycLevel}, kyc_level),
+            status         = COALESCE(#{statusCode}, status)
+        WHERE id = #{userId}
+    </update>
+</mapper>

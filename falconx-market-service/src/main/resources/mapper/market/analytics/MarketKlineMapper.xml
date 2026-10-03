@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.analytics.mapper.MarketKlineMapper">
+
+    <resultMap id="marketKlineRecordMap" type="com.falconx.market.analytics.mapper.record.MarketKlineRecord">
+        <constructor>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="interval_type" javaType="java.lang.String"/>
+            <arg column="open_price" javaType="java.math.BigDecimal"/>
+            <arg column="high_price" javaType="java.math.BigDecimal"/>
+            <arg column="low_price" javaType="java.math.BigDecimal"/>
+            <arg column="close_price" javaType="java.math.BigDecimal"/>
+            <arg column="volume" javaType="java.math.BigDecimal"/>
+            <arg column="open_time" javaType="java.time.LocalDateTime"/>
+            <arg column="close_time" javaType="java.time.LocalDateTime"/>
+            <arg column="source" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="insertKline" parameterType="com.falconx.market.analytics.mapper.record.MarketKlineRecord">
+        INSERT INTO falconx_market_analytics.kline (
+            symbol,
+            interval_type,
+            open_price,
+            high_price,
+            low_price,
+            close_price,
+            volume,
+            open_time,
+            close_time,
+            source
+        ) VALUES (
+            #{symbol},
+            #{intervalType},
+            #{openPrice},
+            #{highPrice},
+            #{lowPrice},
+            #{closePrice},
+            #{volume},
+            fromUnixTimestamp64Milli(#{openTimeEpochMillis}, 'UTC'),
+            fromUnixTimestamp64Milli(#{closeTimeEpochMillis}, 'UTC'),
+            #{source}
+        )
+    </insert>
+
+    <!--
+      kline 表是 ReplacingMergeTree(ingest_time)，去重键 = ORDER BY (symbol, interval_type, open_time)。
+      历史写法用 FINAL 做读时合并去重，但 FINAL 会强制跨 part 合并、内存/耗时随表规模放大（不只读 LIMIT 的几行），
+      在内存吃紧时还会被 OvercommitTracker 选中杀掉导致 500。
+      改为等价的「显式去重」：按 open_time DESC + ingest_time DESC 排序后 LIMIT 1 BY open_time，
+      即每个 K 线桶保留 ingest_time 最大的那行（与 ReplacingMergeTree(ingest_time) FINAL 语义一致），
+      再取最近 #{limit} 根。该写法走主键索引、开销随单 symbol 行数线性增长，不触发全表合并。
+      等价性已在真实数据上逐字段指纹比对验证；当前无重复行时与 FINAL 结果完全一致，有重复时取最新 ingest。
+    -->
+    <!-- 批量插入（#2，2026-06-08）：writer 攒批后单条多行 INSERT，替代逐行 insertKline，消除 part 爆炸。 -->
+    <insert id="insertKlines">
+        INSERT INTO falconx_market_analytics.kline (
+            symbol,
+            interval_type,
+            open_price,
+            high_price,
+            low_price,
+            close_price,
+            volume,
+            open_time,
+            close_time,
+            source
+        ) VALUES
+        <foreach collection="list" item="record" separator=",">
+            (
+                #{record.symbol},
+                #{record.intervalType},
+                #{record.openPrice},
+                #{record.highPrice},
+                #{record.lowPrice},
+                #{record.closePrice},
+                #{record.volume},
+                fromUnixTimestamp64Milli(#{record.openTimeEpochMillis}, 'UTC'),
+                fromUnixTimestamp64Milli(#{record.closeTimeEpochMillis}, 'UTC'),
+                #{record.source}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectRecentKlines" resultMap="marketKlineRecordMap">
+        SELECT symbol,
+               interval_type,
+               open_price,
+               high_price,
+               low_price,
+               close_price,
+               volume,
+               open_time,
+               close_time,
+               source
+        FROM (
+            SELECT symbol,
+                   interval_type,
+                   open_price,
+                   high_price,
+                   low_price,
+                   close_price,
+                   volume,
+                   open_time,
+                   close_time,
+                   source
+            FROM falconx_market_analytics.kline
+            WHERE symbol = #{symbol}
+              AND interval_type = #{interval}
+            ORDER BY open_time DESC, ingest_time DESC
+            LIMIT 1 BY open_time
+            LIMIT #{limit}
+        )
+        ORDER BY open_time ASC
+    </select>
+</mapper>

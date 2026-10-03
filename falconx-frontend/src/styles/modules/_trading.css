@@ -1,0 +1,677 @@
+/* FalconX H5 — trading 核心组件 mobile 适配
+ * 桌面（≥ 768px）保持现有 OrderTicket / fx-modal / fx-positions 样式不变。
+ * 仅在 < 768px 加 mobile 触摸 / 全屏 / 卡片规则。
+ */
+
+/* ============ TablePaginationFooter 桌面默认（无 media query） ============ */
+.fx-pagination-footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  justify-content: flex-end;
+}
+
+.fx-pagination-footer__page {
+  font-size: 12px;
+}
+
+.fx-pagination-footer__total {
+  font-size: 12px;
+  color: var(--fx-subtle);
+}
+
+@media (max-width: 767px) {
+  /* ============ OrderTicket ============ */
+  .order-ticket {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .order-ticket .fx-panel-head {
+    padding: 12px 16px;
+  }
+
+  .ticket-order-type-tabs {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0;
+    padding: 0 16px;
+  }
+
+  .ticket-order-type-tabs button {
+    min-height: 40px;
+    font-size: 13px;
+  }
+
+  .ticket-amount input {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .ticket-switch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 0 16px;
+  }
+
+  .ticket-switch button {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .ticket-switch .long.active {
+    border: 1px solid var(--fx-long);
+    color: var(--fx-long);
+  }
+
+  .ticket-switch .short.active {
+    border: 1px solid var(--fx-short);
+    color: var(--fx-short);
+  }
+
+  .order-ticket input[type="text"],
+  .order-ticket input[type="number"] {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .ticket-checkbox-row {
+    gap: 12px;
+    padding: 8px 16px;
+  }
+
+  .ticket-checkbox-row input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  .order-submit {
+    min-height: 56px;
+    font-size: 15px;
+  }
+
+  /* ============ fx-modal (ClosePosition / AddMargin / EditRiskControls 3 个 modal 共享) ============ */
+  .fx-modal-backdrop {
+    padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom);
+  }
+
+  .fx-modal {
+    width: 100%;
+    max-width: 480px;
+    max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius: var(--fx-radius-lg);
+  }
+
+  .fx-modal-header {
+    padding: 12px 16px;
+  }
+
+  .fx-modal-header h3 {
+    font-size: 16px;
+  }
+
+  .fx-modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .fx-modal-body {
+    padding: 16px;
+    overflow-y: auto;
+  }
+
+  .fx-modal-dl {
+    word-break: break-word;
+  }
+
+  .fx-modal-field input,
+  .fx-modal-field select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .fx-modal-error {
+    font-size: 13px;
+  }
+
+  .fx-modal-footer {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .fx-modal-footer button {
+    min-height: 48px;
+    flex: 1;
+  }
+
+  /* ============ Positions cards (mobile) ============ */
+  .fx-positions-cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .fx-position-card {
+    position: relative;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--fx-hairline);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 140px;
+    background: transparent;
+    cursor: pointer;
+    transition: background 80ms ease;
+  }
+
+  .fx-position-card:active {
+    background: rgba(84, 230, 255, 0.04);
+  }
+
+  .fx-position-card.selected::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--fx-cyan);
+  }
+
+  .fx-position-card__row1 {
+    display: flex;
+    align-items: baseline;
+    gap: var(--fx-space-2);
+    font-size: 15px;
+    letter-spacing: 0.02em;
+  }
+
+  .fx-position-card__row1 .fx-position-card__lev {
+    margin-left: auto;
+    font-size: 10px;
+    letter-spacing: var(--fx-eyebrow-letter);
+    text-transform: uppercase;
+    color: var(--fx-muted);
+    font-family: var(--fx-mono-stack);
+  }
+
+  .fx-position-card__qty {
+    font-family: var(--fx-mono-stack);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--fx-muted);
+  }
+
+  .fx-position-card__symbol {
+    font-weight: 600;
+  }
+
+  .fx-position-card__side {
+    font-size: 12px;
+    letter-spacing: var(--fx-eyebrow-letter);
+  }
+
+  .fx-position-card__row2,
+  .fx-position-card__row3,
+  .fx-position-card__row4 {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-family: var(--fx-mono-stack);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+  }
+
+  .fx-position-card__arrow {
+    color: var(--fx-muted);
+  }
+
+  .fx-position-card__mark-label,
+  .fx-position-card__label {
+    font-size: 10px;
+    letter-spacing: var(--fx-eyebrow-letter);
+    text-transform: uppercase;
+    color: var(--fx-subtle);
+    font-family: Inter, ui-sans-serif, system-ui;
+  }
+
+  .fx-position-card__row3 .fx-position-card__label:nth-of-type(2),
+  .fx-position-card__row4 .fx-position-card__label:nth-of-type(2) {
+    margin-left: 12px;
+  }
+
+  /* STAGE-14E1 Task7：移动端紧凑双币 —— 主值后跟账户币标注，报价币副口径小字另起一行。 */
+  .fx-position-card__ccy {
+    margin-left: 3px;
+    font-size: 9px;
+    letter-spacing: var(--fx-eyebrow-letter);
+    color: var(--fx-subtle);
+    font-weight: 500;
+  }
+  .fx-position-card__pnl-quote {
+    display: block;
+    font-size: 10px;
+    color: var(--fx-muted);
+    font-weight: 500;
+  }
+
+  .fx-position-card__row5 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--fx-mono-stack);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+    color: var(--fx-muted);
+  }
+
+  .fx-position-card__sep {
+    color: var(--fx-subtle);
+  }
+
+  .fx-position-card__actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .fx-position-card__more {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--fx-hairline);
+    border-radius: var(--fx-radius-sm);
+    background: transparent;
+    color: var(--fx-muted);
+    cursor: pointer;
+  }
+
+  .fx-position-card__close {
+    height: 32px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--fx-border-strong);
+    border-radius: var(--fx-radius-sm);
+    background: transparent;
+    color: var(--fx-cyan);
+    font-family: var(--fx-mono-stack);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .fx-position-card__close:active {
+    background: rgba(84, 230, 255, 0.08);
+  }
+
+  .fx-position-card__menu {
+    position: absolute;
+    right: 16px;
+    bottom: 56px;
+    display: flex;
+    gap: 6px;
+    background: var(--fx-surface-2);
+    border: 1px solid var(--fx-hairline);
+    border-radius: var(--fx-radius-md);
+    padding: 6px;
+    z-index: 5;
+    box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.6);
+  }
+
+  .fx-position-card__menu button {
+    padding: 6px 10px;
+    border: 0;
+    border-radius: var(--fx-radius-sm);
+    background: transparent;
+    color: var(--fx-text);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .fx-position-card__menu button:active {
+    background: rgba(84, 230, 255, 0.08);
+  }
+
+  /* ============ History cards (Pending / Orders / Trades / Closed) ============ */
+  .fx-history-cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .fx-history-card {
+    position: relative;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--fx-hairline);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: transparent;
+    cursor: pointer;
+    transition: background 80ms ease, transform 80ms ease;
+  }
+
+  .fx-history-card:active {
+    background: rgba(84, 230, 255, 0.04);
+    transform: scale(0.99);
+  }
+
+  .fx-history-card__row1 {
+    display: flex;
+    align-items: baseline;
+    gap: var(--fx-space-2);
+    font-size: 15px;
+    letter-spacing: 0.02em;
+  }
+
+  .fx-history-card__symbol {
+    font-weight: 600;
+  }
+
+  .fx-history-card__side {
+    font-size: 12px;
+    letter-spacing: var(--fx-eyebrow-letter);
+  }
+
+  .fx-history-card__row1 .fx-history-card__type,
+  .fx-history-card__row1 .fx-history-card__status {
+    margin-left: auto;
+    font-size: 10px;
+    letter-spacing: var(--fx-eyebrow-letter);
+    text-transform: uppercase;
+    color: var(--fx-muted);
+    font-family: var(--fx-mono-stack);
+  }
+
+  .fx-history-card__row2,
+  .fx-history-card__row3 {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-family: var(--fx-mono-stack);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+
+  .fx-history-card__label {
+    font-size: 10px;
+    letter-spacing: var(--fx-eyebrow-letter);
+    text-transform: uppercase;
+    color: var(--fx-subtle);
+    font-family: Inter, ui-sans-serif, system-ui;
+  }
+
+  .fx-history-card__row3 .fx-history-card__label:nth-of-type(2) {
+    margin-left: 12px;
+  }
+
+  .fx-history-card__arrow {
+    color: var(--fx-muted);
+  }
+
+  .fx-history-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--fx-hairline);
+  }
+
+  .fx-history-card__time {
+    font-family: var(--fx-mono-stack);
+    font-size: 11px;
+    color: var(--fx-muted);
+  }
+
+  .fx-history-card__actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .fx-history-card__action-btn {
+    height: 28px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--fx-hairline);
+    border-radius: var(--fx-radius-sm);
+    background: transparent;
+    color: var(--fx-text);
+    font-family: var(--fx-mono-stack);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .fx-history-card__action-btn:active {
+    background: rgba(84, 230, 255, 0.08);
+  }
+
+  .fx-history-card__action-btn--danger {
+    border-color: var(--fx-short);
+    color: var(--fx-short);
+  }
+
+  .fx-history-card__action-btn--danger:active {
+    background: rgba(255, 99, 120, 0.08);
+  }
+
+  .fx-history-card__action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ============ OrderDetailModal (fx-modal-mask + fx-modal--detail 变体) ============ */
+  .fx-modal-mask {
+    padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom);
+  }
+
+  .fx-modal--detail {
+    width: 100%;
+    max-width: 600px;
+    max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius: var(--fx-radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .fx-detail-header {
+    padding: 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .fx-detail-header__title {
+    font-size: 18px;
+  }
+
+  .fx-detail-header__eyebrow {
+    font-size: 10px;
+    letter-spacing: var(--fx-eyebrow-letter);
+  }
+
+  .fx-detail-header__subtitle {
+    font-size: 12px;
+    color: var(--fx-muted);
+  }
+
+  .fx-detail-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .fx-detail-body {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .fx-detail-section {
+    padding: 12px 16px;
+  }
+
+  .fx-detail-section__head {
+    margin-bottom: 8px;
+  }
+
+  .fx-detail-section__title {
+    font-size: 13px;
+  }
+
+  .fx-detail-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .fx-detail-grid__row--wide {
+    grid-column: 1;
+  }
+
+  .fx-detail-grid__label {
+    font-size: 10px;
+  }
+
+  .fx-detail-grid__value {
+    font-size: 14px;
+  }
+
+  .fx-detail-footer {
+    padding: 12px 16px;
+    flex-shrink: 0;
+  }
+
+  /* ============ Pagination footer mobile ============ */
+  .fx-pagination-footer {
+    justify-content: center;
+    padding: 12px 8px;
+    gap: 8px;
+  }
+
+  .fx-pagination-footer__btn {
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .fx-pagination-footer__total {
+    margin-left: 4px;
+    font-size: 11px;
+  }
+
+  /* ============ TradingTabs mobile (6 tab 横滚 + 隐 __num) ============ */
+  .fx-tab-bar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .fx-tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .fx-tab-button {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    min-width: auto;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .fx-tab-button__num {
+    display: none;
+  }
+
+  /* ============ NotificationCenter mobile (drawer 100vw + safe-area) ============ */
+  .notification-drawer {
+    width: 100vw;
+    max-width: 100vw;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .notification-drawer__header {
+    padding: 12px 16px;
+  }
+
+  .notification-drawer__header h3 {
+    font-size: 16px;
+  }
+
+  .notification-drawer__close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .notification-drawer__body {
+    overflow-y: auto;
+  }
+
+  .notification-item {
+    padding: 12px 16px;
+  }
+
+  .notification-item__row {
+    gap: 8px;
+    align-items: center;
+  }
+
+  .notification-item__level {
+    font-size: 10px;
+    letter-spacing: var(--fx-eyebrow-letter);
+    text-transform: uppercase;
+    padding: 2px 6px;
+  }
+
+  .notification-item__title {
+    font-size: 14px;
+  }
+
+  .notification-item__body {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* ============ PriceAlerts create modal title (variant) ============ */
+  .fx-modal-title {
+    padding: 12px 16px;
+    font-size: 16px;
+    border-bottom: 1px solid var(--fx-hairline);
+  }
+
+  /* PriceAlertCard 备注（note）专用 row（其他 history cards 不用）*/
+  .fx-history-card__note {
+    font-size: 12px;
+    color: var(--fx-muted);
+    font-style: italic;
+    padding: 4px 0;
+  }
+}

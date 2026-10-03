@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingTradeMapper">
+
+    <resultMap id="tradingTradeRecordMap" type="com.falconx.trading.repository.mapper.record.TradingTradeRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="order_id" javaType="java.lang.Long"/>
+            <arg column="position_id" javaType="java.lang.Long"/>
+            <arg column="user_id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="side" javaType="java.lang.Integer"/>
+            <arg column="trade_type" javaType="java.lang.Integer"/>
+            <arg column="quantity" javaType="java.math.BigDecimal"/>
+            <arg column="price" javaType="java.math.BigDecimal"/>
+            <arg column="fee" javaType="java.math.BigDecimal"/>
+            <arg column="realized_pnl" javaType="java.math.BigDecimal"/>
+            <arg column="traded_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByOrderIdAndTradeType" resultMap="tradingTradeRecordMap">
+        SELECT id, order_id, position_id, user_id, symbol, side, trade_type, quantity, price, fee, realized_pnl, traded_at
+        FROM t_trade
+        WHERE order_id = #{orderId}
+          AND trade_type = #{tradeTypeCode}
+        ORDER BY traded_at ASC, id ASC
+        LIMIT 1
+    </select>
+
+    <select id="selectByPositionIdAndTradeType" resultMap="tradingTradeRecordMap">
+        SELECT id, order_id, position_id, user_id, symbol, side, trade_type, quantity, price, fee, realized_pnl, traded_at
+        FROM t_trade
+        WHERE position_id = #{positionId}
+          AND trade_type = #{tradeTypeCode}
+        ORDER BY traded_at ASC, id ASC
+        LIMIT 1
+    </select>
+
+    <select id="selectByUserIdPaginated" resultMap="tradingTradeRecordMap">
+        SELECT id,
+               order_id,
+               position_id,
+               user_id,
+               symbol,
+               side,
+               trade_type,
+               quantity,
+               price,
+               fee,
+               realized_pnl,
+               traded_at
+        FROM t_trade
+        WHERE user_id = #{userId}
+        ORDER BY traded_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(1)
+        FROM t_trade
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="insertTradingTrade" parameterType="com.falconx.trading.repository.mapper.record.TradingTradeRecord">
+        INSERT INTO t_trade (
+            id,
+            order_id,
+            position_id,
+            user_id,
+            symbol,
+            side,
+            trade_type,
+            quantity,
+            price,
+            fee,
+            realized_pnl,
+            traded_at
+        ) VALUES (
+            #{id},
+            #{orderId},
+            #{positionId},
+            #{userId},
+            #{symbol},
+            #{sideCode},
+            #{tradeTypeCode},
+            #{quantity},
+            #{price},
+            #{fee},
+            #{realizedPnl},
+            #{tradedAt}
+        )
+    </insert>
+</mapper>

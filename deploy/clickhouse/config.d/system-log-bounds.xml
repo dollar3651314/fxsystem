@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!--
+  2026-06-08：约束 ClickHouse 内置系统日志表，修“CH 不堪一击”根因之一。
+  背景：默认所有 system.*_log 表无 TTL，在 demo 上已涨到 ~40GiB（业务数据才 ~1.9GiB），
+  持续写入 + 后台 merge 抢占有限 CPU（容器仅 1.5→4 核），拖慢真实业务查询、引发 kline 接口
+  间歇超时熔断。
+  策略：
+    - 纯调试用的高频/海量日志（text_log 全量服务器日志、trace_log 采样栈、
+      processors_profile_log 算子级 profile）直接关闭——demo 不需要，且是体量大头(17+15+2.5GiB)。
+    - 运维可能用到的日志（query_log/part_log/metric_log/asynchronous_metric_log/...）保留但加 3 天 TTL，
+      自动回收、不再无界增长。
+  注：remove="1" 覆盖镜像内置 config.xml 的同名段；<ttl> 段在重启后对新建表生效，
+  旧表历史数据由部署时的一次性 TRUNCATE 清掉。
+-->
+<clickhouse>
+    <text_log remove="1"/>
+    <trace_log remove="1"/>
+    <processors_profile_log remove="1"/>
+
+    <query_log>
+        <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+    </query_log>
+    <part_log>
+        <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+    </part_log>
+    <metric_log>
+        <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+    </metric_log>
+    <asynchronous_metric_log>
+        <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+    </asynchronous_metric_log>
+    <query_metric_log>
+        <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+    </query_metric_log>
+    <error_log>
+        <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+    </error_log>
+</clickhouse>

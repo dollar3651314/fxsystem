@@ -1,0 +1,119 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "schemaVersion": 39,
+  "tags": ["falconx", "prod-ops"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "FalconX 生产观测总览",
+  "uid": "falconx-overview",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "服务可用性（up）",
+      "datasource": { "type": "prometheus", "uid": "falconx-prometheus" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "textMode": "value_and_name" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "up{job=~\"falconx-.*\"}", "legendFormat": "{{job}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "market quote 待 flush / 队列上限",
+      "datasource": { "type": "prometheus", "uid": "falconx-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "falconx_market_quote_pending_size", "legendFormat": "pending" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "falconx_market_quote_queue_max", "legendFormat": "queue.max" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "market quote 丢弃累计",
+      "datasource": { "type": "prometheus", "uid": "falconx-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "falconx_market_quote_dropped_total", "legendFormat": "dropped.total" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "market Kafka 发布尾延迟 max（p95 代理）",
+      "datasource": { "type": "prometheus", "uid": "falconx-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "max by (topic) (falconx_market_kafka_publish_duration_seconds_max)", "legendFormat": "{{topic}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "trading tick worker 总排队",
+      "datasource": { "type": "prometheus", "uid": "falconx-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "falconx_trading_tick_worker_queue_total", "legendFormat": "queue.total" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "trading tick 引擎 / 消费耗时 max（p95 代理）",
+      "datasource": { "type": "prometheus", "uid": "falconx-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "max by (job) (falconx_trading_tick_engine_duration_seconds_max)", "legendFormat": "engine" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "max by (job) (falconx_trading_tick_consumer_duration_seconds_max)", "legendFormat": "consumer" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "WebSocket 推送队列 / buffer",
+      "datasource": { "type": "prometheus", "uid": "falconx-prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "falconx_trading_websocket_push_queue_size", "legendFormat": "trading push.queue" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "falconx_market_websocket_buffer_bytes", "legendFormat": "market buffer.bytes" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Kafka consumer lag（按 topic）",
+      "datasource": { "type": "prometheus", "uid": "falconx-prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 30 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "falconx-prometheus" }, "expr": "sum by (topic, consumergroup) (kafka_consumergroup_lag)", "legendFormat": "{{topic}} / {{consumergroup}}" }
+      ]
+    }
+  ]
+}

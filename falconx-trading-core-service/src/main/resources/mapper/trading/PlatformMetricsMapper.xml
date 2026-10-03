@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.PlatformMetricsMapper">
+
+    <resultMap id="positionsStatRowMap" type="com.falconx.trading.repository.mapper.record.PlatformMetricsRecords$PositionsStatRow">
+        <constructor>
+            <arg column="open_count"        javaType="java.lang.Long"/>
+            <arg column="long_count"        javaType="java.lang.Long"/>
+            <arg column="short_count"       javaType="java.lang.Long"/>
+            <arg column="closed_count"      javaType="java.lang.Long"/>
+            <arg column="liquidated_count"  javaType="java.lang.Long"/>
+            <arg column="total_realized_pnl" javaType="java.math.BigDecimal"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 单条 SQL 拍出所有 status 计数 + 多空拆分 + 已实现盈亏总和。
+         t_position.status：1=OPEN / 2=CLOSED / 3=LIQUIDATED。
+         t_position.side：  1=BUY(LONG) / 2=SELL(SHORT)。 -->
+    <select id="selectPositionsStat" resultMap="positionsStatRowMap">
+        SELECT
+            SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END)                   AS open_count,
+            SUM(CASE WHEN status = 1 AND side = 1 THEN 1 ELSE 0 END)      AS long_count,
+            SUM(CASE WHEN status = 1 AND side = 2 THEN 1 ELSE 0 END)      AS short_count,
+            SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END)                   AS closed_count,
+            SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END)                   AS liquidated_count,
+            COALESCE(SUM(CASE WHEN status IN (2, 3) THEN realized_pnl ELSE 0 END), 0) AS total_realized_pnl
+        FROM t_position
+    </select>
+
+    <resultMap id="bizTypeAggregateRowMap" type="com.falconx.trading.repository.mapper.record.PlatformMetricsRecords$BizTypeAggregateRow">
+        <constructor>
+            <arg column="biz_type"     javaType="java.lang.Integer"/>
+            <arg column="total_amount" javaType="java.math.BigDecimal"/>
+            <arg column="entry_count"  javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectLedgerAggregate" resultMap="bizTypeAggregateRowMap">
+        SELECT
+            biz_type       AS biz_type,
+            COALESCE(SUM(amount), 0) AS total_amount,
+            COUNT(*)       AS entry_count
+        FROM t_ledger
+        WHERE biz_type IN
+            <foreach collection="bizTypes" item="bt" open="(" separator="," close=")">
+                #{bt}
+            </foreach>
+        <if test="fromTs != null">
+            AND created_at &gt;= #{fromTs}
+        </if>
+        GROUP BY biz_type
+    </select>
+
+    <resultMap id="userPnlBucketRowMap" type="com.falconx.trading.repository.mapper.record.PlatformMetricsRecords$UserPnlBucketRow">
+        <constructor>
+            <arg column="bucket"     javaType="java.lang.String"/>
+            <arg column="user_count" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 按用户聚合已实现盈亏，再按正/负/零分桶统计用户数。 -->
+    <select id="selectUserPnlDistribution" resultMap="userPnlBucketRowMap">
+        SELECT bucket, COUNT(*) AS user_count FROM (
+            SELECT
+                user_id,
+                CASE WHEN SUM(realized_pnl) &gt; 0 THEN 'WIN'
+                     WHEN SUM(realized_pnl) &lt; 0 THEN 'LOSE'
+                     ELSE 'EVEN' END AS bucket
+            FROM t_position
+            WHERE status IN (2, 3)
+              AND realized_pnl IS NOT NULL
+            GROUP BY user_id
+        ) t
+        GROUP BY bucket
+    </select>
+
+    <resultMap id="biggestPositionRowMap" type="com.falconx.trading.repository.mapper.record.PlatformMetricsRecords$BiggestPositionRow">
+        <constructor>
+            <arg column="user_id"      javaType="java.lang.Long"/>
+            <arg column="symbol"       javaType="java.lang.String"/>
+            <arg column="realized_pnl" javaType="java.math.BigDecimal"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectBiggestPosition" resultMap="biggestPositionRowMap">
+        SELECT user_id, symbol, realized_pnl
+        FROM t_position
+        WHERE status IN (2, 3)
+          AND realized_pnl IS NOT NULL
+        ORDER BY realized_pnl
+        <choose>
+            <when test="direction == 'WIN'">DESC</when>
+            <otherwise>ASC</otherwise>
+        </choose>
+        LIMIT 1
+    </select>
+
+    <!-- t_order.status：2=FILLED（与 TradingMybatisSupport.toOrderStatusCode 对齐） -->
+    <select id="countFilledOrders" resultType="long">
+        SELECT COUNT(*) FROM t_order WHERE status = 2
+    </select>
+
+    <select id="countFilledOrdersToday" resultType="long">
+        SELECT COUNT(*) FROM t_order
+        WHERE status = 2
+          AND created_at &gt;= CURRENT_DATE()
+    </select>
+
+</mapper>

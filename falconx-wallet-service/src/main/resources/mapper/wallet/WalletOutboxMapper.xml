@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.wallet.repository.mapper.WalletOutboxMapper">
+
+    <resultMap id="walletOutboxRecordMap" type="com.falconx.wallet.repository.mapper.record.WalletOutboxRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="event_id" javaType="java.lang.String"/>
+            <arg column="event_type" javaType="java.lang.String"/>
+            <arg column="topic" javaType="java.lang.String"/>
+            <arg column="partition_key" javaType="java.lang.String"/>
+            <arg column="payload" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.Integer"/>
+            <arg column="retry_count" javaType="java.lang.Integer"/>
+            <arg column="next_retry_at" javaType="java.time.LocalDateTime"/>
+            <arg column="last_error" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="sent_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="upsertWalletOutbox" parameterType="com.falconx.wallet.repository.mapper.record.WalletOutboxRecord">
+        INSERT INTO t_outbox (
+            id,
+            event_id,
+            event_type,
+            topic,
+            partition_key,
+            payload,
+            status,
+            retry_count,
+            next_retry_at,
+            last_error,
+            created_at,
+            sent_at,
+            updated_at
+        ) VALUES (
+            #{id},
+            #{eventId},
+            #{eventType},
+            #{topic},
+            #{partitionKey},
+            CAST(#{payloadJson} AS JSON),
+            #{statusCode},
+            #{retryCount},
+            #{nextRetryAt},
+            #{lastError},
+            #{createdAt},
+            #{sentAt},
+            #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            event_type = VALUES(event_type),
+            topic = VALUES(topic),
+            partition_key = VALUES(partition_key),
+            payload = VALUES(payload),
+            status = VALUES(status),
+            retry_count = VALUES(retry_count),
+            next_retry_at = VALUES(next_retry_at),
+            last_error = VALUES(last_error),
+            sent_at = VALUES(sent_at),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <select id="selectDispatchableBatch" resultMap="walletOutboxRecordMap">
+        SELECT id,
+               event_id,
+               event_type,
+               topic,
+               partition_key,
+               CAST(payload AS CHAR) AS payload,
+               status,
+               retry_count,
+               next_retry_at,
+               last_error,
+               created_at,
+               sent_at,
+               updated_at
+        FROM t_outbox
+        WHERE status IN (0, 3)
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now})
+        ORDER BY created_at ASC, id ASC
+        LIMIT #{limit}
+        FOR UPDATE SKIP LOCKED
+    </select>
+
+    <update id="updateDispatchingById">
+        UPDATE t_outbox
+        SET status = 1,
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateSentById">
+        UPDATE t_outbox
+        SET status = 2,
+            sent_at = #{sentAt},
+            updated_at = #{sentAt}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateFailedById">
+        UPDATE t_outbox
+        SET status = #{statusCode},
+            retry_count = #{retryCount},
+            next_retry_at = #{nextRetryAt},
+            last_error = #{lastError},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="walletOutboxRecordMap">
+        SELECT id,
+               event_id,
+               event_type,
+               topic,
+               partition_key,
+               CAST(payload AS CHAR) AS payload,
+               status,
+               retry_count,
+               next_retry_at,
+               last_error,
+               created_at,
+               sent_at,
+               updated_at
+        FROM t_outbox
+        WHERE id = #{id}
+    </select>
+
+    <!-- 2026-05-21 删 sent 行 cleanup（与 market/trading 同模式）。LIMIT 防长事务。 -->
+    <delete id="deleteSentBefore">
+        DELETE FROM t_outbox
+        WHERE status = 2
+          AND sent_at IS NOT NULL
+          AND sent_at &lt; #{cutoff}
+        LIMIT #{limit}
+    </delete>
+</mapper>

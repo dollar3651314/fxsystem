@@ -1,0 +1,160 @@
+# promtool 单测：falconx-trading.rules.yml
+rule_files:
+  - falconx-trading.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # FalconxTradingTickQueueTotalHigh：总排队 >1000 持续 30s 触发。
+  - interval: 30s
+    input_series:
+      - series: 'falconx_trading_tick_worker_queue_total{job="falconx-trading-core"}'
+        values: "1500 1500 1500"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxTradingTickQueueTotalHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P0
+              job: falconx-trading-core
+            exp_annotations:
+              summary: "trading tick worker 总排队积压"
+              description: "falconx_trading_tick_worker_queue_total > 1000 已持续 30 秒，tick 处理跟不上消费速率。"
+
+  # 总排队 200 不触发。
+  - interval: 30s
+    input_series:
+      - series: 'falconx_trading_tick_worker_queue_total{job="falconx-trading-core"}'
+        values: "200 200 200"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxTradingTickQueueTotalHigh
+        exp_alerts: []
+
+  # FalconxTradingTickWorkerQueueHigh：单 worker >500 持续 30s（P2）触发。
+  - interval: 30s
+    input_series:
+      - series: 'falconx_trading_tick_worker_queue_size{job="falconx-trading-core", worker="worker-3"}'
+        values: "700 700 700"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxTradingTickWorkerQueueHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P2
+              job: falconx-trading-core
+              worker: worker-3
+            exp_annotations:
+              summary: "trading 单 worker 排队积压：worker-3"
+              description: "falconx_trading_tick_worker_queue_size{worker=worker-3} > 500 已持续 30 秒。"
+
+  # FalconxTradingTickQueueDelaySlow：_seconds_max >0.2 持续 5m 触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_trading_tick_queue_delay_seconds_max{job="falconx-trading-core", symbol="EURUSD"}'
+        values: "0.3x5"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: FalconxTradingTickQueueDelaySlow
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              job: falconx-trading-core
+            exp_annotations:
+              summary: "trading tick 排队延迟过高"
+              description: "falconx_trading_tick_queue_delay_seconds_max（p95 保守代理）> 200ms 已持续 5 分钟。"
+
+  # FalconxTradingTickEngineSlow：_seconds_max >0.3 持续 5m 触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_trading_tick_engine_duration_seconds_max{job="falconx-trading-core", symbol="EURUSD", outcome="success"}'
+        values: "0.5x5"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: FalconxTradingTickEngineSlow
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              job: falconx-trading-core
+            exp_annotations:
+              summary: "trading QuoteDrivenEngine 处理耗时过高"
+              description: "falconx_trading_tick_engine_duration_seconds_max（p95 保守代理）> 300ms 已持续 5 分钟。"
+
+  # 引擎耗时 0.05s 不触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_trading_tick_engine_duration_seconds_max{job="falconx-trading-core", symbol="EURUSD"}'
+        values: "0.05x5"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: FalconxTradingTickEngineSlow
+        exp_alerts: []
+
+  # FalconxTradingTickConsumerSlow：_seconds_max >0.5 持续 5m 触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_trading_tick_consumer_duration_seconds_max{job="falconx-trading-core", symbol="EURUSD"}'
+        values: "0.8x5"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: FalconxTradingTickConsumerSlow
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              job: falconx-trading-core
+            exp_annotations:
+              summary: "trading tick 消费总耗时过高"
+              description: "falconx_trading_tick_consumer_duration_seconds_max（p95 保守代理）> 500ms 已持续 5 分钟。"
+
+  # FalconxTradingTickConsumerFailures：Counter 5m 增量 >0 触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_trading_tick_consumer_failures_total{job="falconx-trading-core", symbol="BTCUSD", reason="quote-stale"}'
+        values: "0 0 0 0 0 2"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: FalconxTradingTickConsumerFailures
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              job: falconx-trading-core
+              symbol: BTCUSD
+              reason: quote-stale
+            exp_annotations:
+              summary: "trading tick 消费失败：BTCUSD"
+              description: "falconx_trading_tick_consumer_failures_total 5 分钟窗口增量 > 0（symbol=BTCUSD reason=quote-stale）。"
+
+  # FalconxTradingWebSocketPushQueueHigh：push queue >1000 持续 30s 触发。
+  - interval: 30s
+    input_series:
+      - series: 'falconx_trading_websocket_push_queue_size{job="falconx-trading-core", service="trading-core"}'
+        values: "1200 1200 1200"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxTradingWebSocketPushQueueHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              job: falconx-trading-core
+              service: trading-core
+            exp_annotations:
+              summary: "trading WebSocket 推送队列积压"
+              description: "falconx_trading_websocket_push_queue_size > 1000 已持续 30 秒，推送线程跟不上事件产出。"
+
+  # FalconxTradingWebSocketBufferHigh：buffer > sessions*419430 持续 3m 触发。
+  - interval: 1m
+    input_series:
+      - series: 'falconx_trading_websocket_buffer_bytes{job="falconx-trading-core"}'
+        values: "500000000 500000000 500000000 500000000"
+      - series: 'falconx_trading_websocket_sessions_active{job="falconx-trading-core"}'
+        values: "100 100 100 100"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: FalconxTradingWebSocketBufferHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              job: falconx-trading-core
+            exp_annotations:
+              summary: "trading WebSocket 待发送 buffer 接近容量"
+              description: "falconx_trading_websocket_buffer_bytes 已超过 activeSessions×512KiB×0.8 持续 3 分钟。"

@@ -1,0 +1,29 @@
+# FalconX 平台级告警规则（服务可用性 / JVM）
+# 真源：docs/operations/生产观测与回滚手册.md §3 告警分级
+# severity 标签对齐手册 P0/P1/P2；规则正确性由同目录 *_test.yml（promtool）覆盖。
+groups:
+  - name: falconx-platform-availability
+    rules:
+      # 抓取失败即视为服务不可达 / 宕（health DOWN 的可机器判定代理）。
+      - alert: FalconxServiceDown
+        expr: up{job=~"falconx-.*"} == 0
+        for: 1m
+        labels:
+          severity: P0
+        annotations:
+          summary: "FalconX 服务不可达：{{ $labels.job }}"
+          description: "{{ $labels.job }}（{{ $labels.instance }}）/actuator/prometheus 抓取失败已持续 1 分钟，疑似宕机或 health DOWN。5 分钟内确认是否降级或回滚。"
+
+  - name: falconx-platform-jvm
+    rules:
+      # JVM 堆接近上限（堆使用率 ≥ 0.9 持续 5 分钟）。Spring Boot Actuator 默认指标。
+      - alert: FalconxJvmHeapHigh
+        expr: |
+          sum by (job, instance) (jvm_memory_used_bytes{area="heap"})
+            / sum by (job, instance) (jvm_memory_max_bytes{area="heap"}) >= 0.9
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "JVM 堆使用率偏高：{{ $labels.job }}"
+          description: "{{ $labels.job }} 堆使用率 ≥ 90% 已持续 5 分钟，存在 OOM 风险（local-start 已配 -XX:+HeapDumpOnOutOfMemoryError）。"

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.repository.mapper.MarketSymbolQuoteMappingMapper">
+
+    <resultMap id="MarketSymbolQuoteMappingRecordMap" type="com.falconx.market.repository.mapper.record.MarketSymbolQuoteMappingRecord">
+        <constructor>
+            <arg column="platform_symbol" javaType="java.lang.String"/>
+            <arg column="source_provider" javaType="java.lang.String"/>
+            <arg column="source_lp_code" javaType="java.lang.String"/>
+            <arg column="source_symbol" javaType="java.lang.String"/>
+            <arg column="price_multiplier" javaType="java.math.BigDecimal"/>
+            <arg column="bid_adjustment" javaType="java.math.BigDecimal"/>
+            <arg column="ask_adjustment" javaType="java.math.BigDecimal"/>
+            <arg column="enabled" javaType="java.lang.Integer"/>
+            <arg column="lp_subscribe_enabled" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectAllLpSubscribedMappings" resultMap="MarketSymbolQuoteMappingRecordMap">
+        SELECT
+            platform_symbol,
+            source_provider,
+            source_lp_code,
+            source_symbol,
+            price_multiplier,
+            bid_adjustment,
+            ask_adjustment,
+            enabled,
+            lp_subscribe_enabled
+        FROM t_symbol_quote_mapping m
+        INNER JOIN t_symbol s
+            ON s.lp_code = m.source_lp_code
+            AND s.symbol = m.source_symbol
+            AND s.status = 1
+        WHERE m.enabled = 1
+            AND m.lp_subscribe_enabled = 1
+        ORDER BY m.platform_symbol ASC
+    </select>
+</mapper>

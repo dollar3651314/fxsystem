@@ -1,0 +1,445 @@
+# FalconX 一期 — AWS 演示档单机部署
+# 用法：
+#   docker compose -f docker-compose.prod.yml build       # 本地构建所有镜像
+#   docker compose -f docker-compose.prod.yml up -d       # 拉起整套
+#   docker compose -f docker-compose.prod.yml logs -f <svc>
+#
+# 设计原则：
+# - 所有"测试环境配置"内联在本文件 environment 块（用户拍板的 yaml 方案）
+# - 数据库 schema 通过 createDatabaseIfNotExist + init 脚本双保险
+# - 外部入口仅 80（edge nginx）；其他端口虽然映射到主机 0.0.0.0 便于调试，
+#   生产部署请通过 AWS 安全组限制（仅 22 + 80 + 443 对外）
+
+# 2026-05-26 性能加固：容器日志大小限制（防 14GB market log 撑爆磁盘历史复发）
+# 单容器 max=5*100m=500m，16 容器最多 ~8GB，远小于宿主 193GB 磁盘
+x-log-options: &log-options
+  driver: json-file
+  options:
+    max-size: "100m"
+    max-file: "5"
+
+# 资源分配（docker compose 不支持多 anchor 合并，直接在各 service 段 hardcode）：
+#   trading-core / market: mem_limit=3g, cpus=1.5（订单/持仓/quote 累积，重量）
+#   identity / gateway / wallet / console: mem_limit=1500m, cpus=1.0（轻量）
+#   3 前端 + edge: mem_limit=256m / 128m, cpus=0.5
+#   基础设施 mysql/redis/kafka: mem_limit=2g/768m/2g；clickhouse=4g（2026-06-08 由 2g 上调，见该段注释）
+# 总分配约 24GB，留 6GB 给系统缓存（宿主 30GB RAM；当前实际可用 22GB，余量充足）
+
+x-backend-common: &backend-common
+  restart: unless-stopped
+  networks: [falconx]
+  logging: *log-options
+  volumes:
+    # heap dump（OOM 时自动 dump）+ GC log，按容器 hostname 隔离子目录
+    - ./jvm-logs:/var/log/falconx
+  environment: &backend-env
+    SPRING_PROFILES_ACTIVE: dev
+    # 数据库（5 个服务共享 root/root）
+    FALCONX_IDENTITY_DB_USERNAME: root
+    FALCONX_IDENTITY_DB_PASSWORD: root
+    FALCONX_MARKET_DB_USERNAME: root
+    FALCONX_MARKET_DB_PASSWORD: root
+    FALCONX_TRADING_DB_USERNAME: root
+    FALCONX_TRADING_DB_PASSWORD: root
+    FALCONX_WALLET_DB_USERNAME: root
+    FALCONX_WALLET_DB_PASSWORD: root
+    FALCONX_CONSOLE_DB_USERNAME: root
+    FALCONX_CONSOLE_DB_PASSWORD: root
+    # 容器网络内的主机名（同时设 Spring 标准 env，覆盖 dev profile 里 hardcoded localhost）
+    FALCONX_REDIS_HOST: redis
+    FALCONX_REDIS_PORT: '6379'
+    SPRING_DATA_REDIS_HOST: redis
+    SPRING_DATA_REDIS_PORT: '6379'
+    # 内部服务 token
+    FALCONX_INTERNAL_API_TOKEN: falconx-internal-dev-token
+    # 系统配置中心：容器内必须走 compose service name，不能使用 localhost
+    FALCONX_SYSTEM_CONFIG_CONSOLE_BASE_URL: http://console-service:18085
+    FALCONX_SYSTEM_CONFIG_INTERNAL_TOKEN: falconx-internal-dev-token
+    # 把 jdbc url 中的 localhost 改成 mysql 容器名
+    # 走 Spring Boot externalized config：spring.datasource.url 覆盖
+    SPRING_DATASOURCE_URL: ''                   # 每个服务独立覆盖
+    # kafka bootstrap servers
+    SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+services:
+  # =========================================================================
+  # 基础设施
+  # =========================================================================
+  mysql:
+    image: mysql:8.4
+    container_name: falconx-mysql
+    restart: unless-stopped
+    logging: *log-options
+    mem_limit: 2g
+    cpus: 1.5
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+      # 2026-05-26 性能加固：开启慢查询日志，阈值 1s（原 long_query_time=10s + slow_query_log=OFF）
+      - --slow-query-log=1
+      - --slow-query-log-file=/var/lib/mysql/slow.log
+      - --long-query-time=1
+      - --log-slow-extra=1
+      - --log-slow-admin-statements=1
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: falconx
+    ports:
+      - "3306:3306"
+    volumes:
+      - falconx-mysql-data:/var/lib/mysql
+      - ./deploy/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks: [falconx]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      # 2026-05-26 性能加固：healthcheck 间隔从 10s 放宽到 30s（demo 不需要快速感知，定期 ping CPU 浪费）
+      interval: 30s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8.2
+    container_name: falconx-redis
+    restart: unless-stopped
+    logging: *log-options
+    mem_limit: 768m
+    cpus: 1.0
+    # 2026-05-26 性能加固：原 maxmemory=0 + noeviction policy，配合无 mem_limit = 双重无界，OOM 风险
+    # 加 maxmemory=512mb + allkeys-lru：满了自动淘汰最少使用键
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - falconx-redis-data:/data
+    networks: [falconx]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:4.2.0
+    container_name: falconx-kafka
+    restart: unless-stopped
+    logging: *log-options
+    mem_limit: 2g
+    cpus: 1.5
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # 双 listener：容器内走 PLAINTEXT://kafka:9092；外部调试走 EXTERNAL://localhost:9094（映射 9092）
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    networks: [falconx]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      # 2026-05-26 性能加固：从 15s 放宽到 45s（kafka-topics.sh 每次启 JVM，CPU 抖动大）
+      interval: 45s
+      timeout: 10s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse:25.8
+    container_name: falconx-clickhouse
+    restart: unless-stopped
+    logging: *log-options
+    # 2026-06-08：2g→4g。quote_tick 7 天 TTL 稳态 ~1.6GiB + 持续 merge 工作集（19 并发 merge ~420MiB），
+    # 把 MemoryTracking 顶到 90% 上限（2g 时 max_server_memory_usage=1.80GiB），OvercommitTracker 随机
+    # 杀新进查询 → kline 接口间歇 500（MEMORY_LIMIT_EXCEEDED）。kline 查询本身仅 ~2MiB，是受害者非元凶。
+    # 升 4g 后 max_server_memory_usage≈3.6GiB，留 ~2GiB 查询余量。宿主 30GB / 当前可用 22GB，安全。
+    mem_limit: 4g
+    # 2026-06-08：1.5→4 核。CH 查询慢/熔断根因之一是 CPU 被系统日志+part merge 抢占（实测打满
+    # 153%@1.5核）。宿主 16 核、当前分配 ~13.5，余量足。配合 config.d 收敛系统日志一并见效。
+    cpus: 4
+    environment:
+      CLICKHOUSE_DB: falconx_market_analytics
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - falconx-clickhouse-data:/var/lib/clickhouse
+      - ./deploy/clickhouse/users.d/default-user.xml:/etc/clickhouse-server/users.d/default-user.xml:ro
+      # 2026-06-08：收敛内置系统日志（关 text/trace/processors_profile + 其余 3 天 TTL），见该文件注释
+      - ./deploy/clickhouse/config.d/system-log-bounds.xml:/etc/clickhouse-server/config.d/system-log-bounds.xml:ro
+    networks: [falconx]
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --password falconx --query 'SELECT 1' >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  # =========================================================================
+  # 后端
+  # =========================================================================
+  identity-service:
+    <<: *backend-common
+    mem_limit: 1500m
+    cpus: 1.0
+    image: falconx-identity-service:demo
+    container_name: falconx-identity-service
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.backend
+      args:
+        JAR_PATH: falconx-identity-service/target/falconx-identity-service-1.0.0-SNAPSHOT.jar
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      console-service: { condition: service_started }
+    environment:
+      <<: *backend-env
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/falconx_identity?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      # 2026-05-27 Sprint 6 A8：原无 JAVA_OPTS 用 Dockerfile 默认 Xmx512m，mem_limit=1500m 下偏小。显式 1g。
+      JAVA_OPTS: '-XX:+UseG1GC -Xmx1g'
+    ports:
+      - "18081:18081"
+
+  gateway:
+    <<: *backend-common
+    mem_limit: 1500m
+    cpus: 1.0
+    image: falconx-gateway:demo
+    container_name: falconx-gateway
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.backend
+      args:
+        JAR_PATH: falconx-gateway/target/falconx-gateway-1.0.0-SNAPSHOT.jar
+    depends_on:
+      identity-service: { condition: service_started }
+      console-service: { condition: service_started }
+      redis: { condition: service_healthy }
+    environment:
+      <<: *backend-env
+      # gateway 路由指向 docker 网络主机名（REST + WebSocket 复用 base url）
+      FALCONX_GATEWAY_ROUTES_IDENTITY_BASE_URL: http://identity-service:18081
+      FALCONX_GATEWAY_ROUTES_MARKET_BASE_URL: http://market-service:18082
+      FALCONX_GATEWAY_ROUTES_TRADING_BASE_URL: http://trading-core-service:18083
+      FALCONX_GATEWAY_ROUTES_WALLET_BASE_URL: http://wallet-service:18084
+      FALCONX_GATEWAY_ROUTES_CONSOLE_BASE_URL: http://console-service:18085
+      # 2026-05-27 Sprint 6 A8：原无 JAVA_OPTS 用 Dockerfile 默认 Xmx512m。gateway reactive Netty，显式 1g。
+      JAVA_OPTS: '-XX:+UseG1GC -Xmx1g'
+    ports:
+      - "18080:18080"
+
+  trading-core-service:
+    <<: *backend-common
+    mem_limit: 3g
+    cpus: 1.5
+    image: falconx-trading-core-service:demo
+    container_name: falconx-trading-core-service
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.backend
+      args:
+        JAR_PATH: falconx-trading-core-service/target/falconx-trading-core-service-1.0.0-SNAPSHOT.jar
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      console-service: { condition: service_started }
+    environment:
+      <<: *backend-env
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/falconx_trading?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      FALCONX_GATEWAY_BASE_URL: http://gateway:18080
+      # 本地 dev 参数沿用 local-start.sh：避免 stub stale
+      # 2026-05-27 Sprint 6 A8：Xmx 768m → 2g（mem_limit=3g，留 1g 给堆外/metaspace/线程栈/NMT）。
+      # trading 有大量持仓 PnL 计算 + Kafka 消费 + 缓存，768m 堆高负载易频繁 GC。
+      JAVA_OPTS: '-XX:+UseG1GC -Xmx2g -Dfalconx.trading.cache.quote-ttl=1d -Dfalconx.trading.stale.max-age=1d'
+    ports:
+      - "18083:18083"
+
+  market-service:
+    <<: *backend-common
+    mem_limit: 3g
+    cpus: 1.5
+    image: falconx-market-service:demo
+    container_name: falconx-market-service
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.backend
+      args:
+        JAR_PATH: falconx-market-service/target/falconx-market-service-1.0.0-SNAPSHOT.jar
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      trading-core-service: { condition: service_started }  # trading consumer 先注册
+    environment:
+      <<: *backend-env
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/falconx_market?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      # LP 行情源（测试环境内联）
+      FALCONX_MARKET_LP_DOMAIN: wss://vibe.zerogridtech.com/
+      FALCONX_MARKET_LP_URI: /safe/socket.io/
+      FALCONX_MARKET_LP_APP_ID: BeeMarkets
+      FALCONX_MARKET_LP_TOKEN: gm4uiUNXx3h9bMOt
+      FALCONX_MARKET_LP_SECRET_KEY: zTLD5D4yIdn7mRKU57IkncL1mKLn3KMGQklVpvryivK
+      FALCONX_MARKET_LP_SERVER_ID: '17'
+      FALCONX_MARKET_LP_META_TRADE_VERSION: '5'
+      FALCONX_MARKET_LP_META_TRADER_ID: '17'
+      FALCONX_MARKET_LP_EIO: '4'
+      # ClickHouse JDBC（连容器名）+ falconx 密码
+      FALCONX_MARKET_ANALYTICS_JDBC_URL: jdbc:clickhouse://clickhouse:8123/falconx_market_analytics
+      # 注：AWS 公网直连 LP，使用 JDK 默认 cacerts 校验公共 CA；本地 WSL 需要 trustStore 是因为公司代理 MITM
+      # 2026-05-27 Sprint 6 A8：Xmx 768m → 2g（mem_limit=3g）。market 有 dispatcher 16 分区线程
+      # + ClickHouse 批量缓冲 + K 线聚合状态，768m 堆偏小。
+      JAVA_OPTS: >-
+        -XX:+UseG1GC -Xmx2g
+        -Dfalconx.market.analytics.password=falconx
+        -Dfalconx.market.analytics.quote-flush-interval=10000
+    ports:
+      - "18082:18082"
+
+  wallet-service:
+    <<: *backend-common
+    mem_limit: 1500m
+    cpus: 1.0
+    image: falconx-wallet-service:demo
+    container_name: falconx-wallet-service
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.backend
+      args:
+        JAR_PATH: falconx-wallet-service/target/falconx-wallet-service-1.0.0-SNAPSHOT.jar
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      console-service: { condition: service_started }
+    environment:
+      <<: *backend-env
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/falconx_wallet?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      # ETH 链 RPC（Sepolia testnet — 用户拍板保留）
+      Alchemy_Ethereum_Sepolia_HTTPS: https://eth-sepolia.g.alchemy.com/v2/j6-5C7HK6dXPSSAyrZZqq
+      Alchemy_Ethereum_Sepolia_WSS: wss://eth-sepolia.g.alchemy.com/v2/j6-5C7HK6dXPSSAyrZZqq
+      Alchemy_Ethereum_Mainnet_HTTPS: https://eth-mainnet.g.alchemy.com/v2/j6-5C7HK6dXPSSAyrZZqq
+      Alchemy_Ethereum_Mainnet_WSS: wss://eth-mainnet.g.alchemy.com/v2/j6-5C7HK6dXPSSAyrZZqq
+      Alchemy_Ethereum_Hoodi_HTTPS: https://eth-hoodi.g.alchemy.com/v2/j6-5C7HK6dXPSSAyrZZqq
+      Alchemy_Ethereum_Hoodi_WSS: wss://eth-hoodi.g.alchemy.com/v2/j6-5C7HK6dXPSSAyrZZqq
+      # 热钱包私钥 + 地址 + USDC 合约（Sepolia）
+      FALCONX_WALLET_ERC20_PRIVATE_KEY_PEM: c1084a0174ca0c65a8d07d8a7cb525930f6cde68ab6cdfec2766805eae539e6
+      FALCONX_WALLET_ERC20_FROM_ADDRESS: '0x7a58b441a0bbff8186c2949497303199d1eb151d'
+      FALCONX_WALLET_ERC20_USDC_CONTRACT: ${FALCONX_WALLET_ERC20_USDC_CONTRACT:-}
+      FALCONX_WALLET_ERC20_USDC_DECIMALS: '6'
+      FALCONX_WALLET_ERC20_USDT_CONTRACT: ${FALCONX_WALLET_ERC20_USDT_CONTRACT:-}
+      FALCONX_WALLET_ERC20_USDT_DECIMALS: ${FALCONX_WALLET_ERC20_USDT_DECIMALS:-6}
+      FALCONX_WALLET_ERC20_CHAIN_ID: '11155111'
+      # TRC20 Nile testnet RPC + USDT 合约由根目录 .env / 部署环境注入
+      ALCHEMY_ETHEREUM_NILETEST_HTTPS: ${ALCHEMY_ETHEREUM_NILETEST_HTTPS:-}
+      FALCONX_WALLET_TRC20_USDT_CONTRACT: ${FALCONX_WALLET_TRC20_USDT_CONTRACT:-}
+      FALCONX_WALLET_TRC20_USDT_DECIMALS: ${FALCONX_WALLET_TRC20_USDT_DECIMALS:-6}
+      # xpub（沿用 local-start.sh 现有值）
+      FALCONX_WALLET_ETH_ACCOUNT_XPUB: xpub6DB3tvxWiLh7aM2mLjwUbRfNGw65C1SAz8ayQbhsXnHgBc1gywUyrwen7cb2XJ8hDWduFZGE2AMRzJBSC2p6ci62NRdBvbtzWGvGNjTRsT5
+      FALCONX_WALLET_TRON_ACCOUNT_XPUB: xpub6DL73xExtJREFmDHsmeqTiWA3hiSAw3JirYQcsbaN3tMdpRDW3rqXQymJChEJpfEgBZkDe7d5VQe7N1Y9PaxcicPobqaDAzy9habuhAzGXN
+      # 2026-05-25：链上入金扫块间隔统一调整为 5m（用户要求降低拉取频率，本地为 1d）
+      # BSC/TRON/SOL 没配真实 RPC（compose 没注入），5m 间隔会产生 connection refused 日志，已知可接受
+      # 注：AWS 公网直连 Alchemy，使用 JDK 默认 cacerts；本地 WSL 才需要 trustStore
+      # 2026-05-27 Sprint 6 A8：Xmx 768m → 1g（mem_limit=1500m，留 500m）。
+      JAVA_OPTS: >-
+        -XX:+UseG1GC -Xmx1g
+        -Dfalconx.wallet.chains.eth.scan-interval=5m
+        -Dfalconx.wallet.chains.bsc.scan-interval=5m
+        -Dfalconx.wallet.chains.tron.scan-interval=5m
+        -Dfalconx.wallet.chains.sol.scan-interval=5m
+    ports:
+      - "18084:18084"
+
+  console-service:
+    <<: *backend-common
+    mem_limit: 1500m
+    cpus: 1.0
+    image: falconx-console-service:demo
+    container_name: falconx-console-service
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.backend
+      args:
+        JAR_PATH: falconx-console-service/target/falconx-console-service-1.0.0-SNAPSHOT.jar
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    environment:
+      <<: *backend-env
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/falconx_console?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      FALCONX_GATEWAY_BASE_URL: http://gateway:18080
+      # console-service 是系统配置 owner，不作为客户端启动自拉取，避免自依赖降级错误。
+      FALCONX_SYSTEM_CONFIG_ENABLED: 'false'
+      # 2026-05-27 Sprint 6 A8：原无 JAVA_OPTS 用 Dockerfile 默认 Xmx512m。显式 1g。
+      JAVA_OPTS: '-XX:+UseG1GC -Xmx1g'
+    ports:
+      - "18085:18085"
+
+  # =========================================================================
+  # 前端 + 入口 nginx
+  # =========================================================================
+  client-frontend:
+    image: falconx-frontend:demo
+    container_name: falconx-client-frontend
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.frontend
+      args:
+        APP_DIR: falconx-frontend
+    restart: unless-stopped
+    logging: *log-options
+    mem_limit: 256m
+    cpus: 0.5
+    networks: [falconx]
+    # 内部使用，不直接对外（走 edge）
+
+  admin-frontend:
+    image: falconx-console-frontend:demo
+    container_name: falconx-admin-frontend
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.frontend
+      args:
+        APP_DIR: falconx-console-frontend
+    restart: unless-stopped
+    logging: *log-options
+    mem_limit: 256m
+    cpus: 0.5
+    networks: [falconx]
+
+  edge:
+    image: falconx-edge:demo
+    container_name: falconx-edge
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.edge
+    restart: unless-stopped
+    logging: *log-options
+    mem_limit: 128m
+    cpus: 0.5
+    depends_on:
+      - client-frontend
+      - admin-frontend
+      - gateway
+      - console-service
+    ports:
+      - "80:80"
+    networks: [falconx]
+
+networks:
+  falconx:
+    name: falconx
+
+volumes:
+  falconx-mysql-data:
+  falconx-clickhouse-data:
+  falconx-redis-data:

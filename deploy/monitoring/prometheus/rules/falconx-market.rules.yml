@@ -1,0 +1,67 @@
+# FalconX market-service 行情入口告警规则
+# 真源：docs/operations/生产观测与回滚手册.md §2.1 + §2.3（market WebSocket）
+# 指标类型：pending.size / dropped.total / queue.max = Gauge；publish.failures = Counter；
+#           publish.duration = Timer，已在 market application.yml 开 percentiles-histogram
+#           （低基数 topic/eventType/outcome），暴露 _seconds_bucket，用 histogram_quantile 计算真 p95。
+groups:
+  - name: falconx-market-quote
+    rules:
+      # 待 flush 队列水位 ≥ 80% 持续 30s（接近 drop-oldest）。
+      - alert: FalconxMarketQuotePendingHigh
+        expr: |
+          falconx_market_quote_pending_size
+            / falconx_market_quote_queue_max >= 0.8
+        for: 30s
+        labels:
+          severity: P0
+        annotations:
+          summary: "market quote 待 flush 队列水位过高"
+          description: "falconx_market_quote_pending_size / queue_max ≥ 0.8 已持续 30 秒，ClickHouse 写入慢于 LP push，即将触发 drop-oldest。"
+
+      # 5 分钟窗口内出现新增丢弃（dropped.total 为单调 Gauge，用 delta 判定增量）。
+      - alert: FalconxMarketQuoteDropped
+        expr: delta(falconx_market_quote_dropped_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: P0
+        annotations:
+          summary: "market 正在丢弃 quote tick"
+          description: "falconx_market_quote_dropped_total 5 分钟窗口增量 > 0，确实在丢数据；排查 ClickHouse 写入吞吐。"
+
+  - name: falconx-market-kafka
+    rules:
+      # Kafka 发布真 p95（histogram_quantile）> 500ms 持续 5 分钟。
+      - alert: FalconxMarketKafkaPublishSlow
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, job, topic) (rate(falconx_market_kafka_publish_duration_seconds_bucket[5m]))) > 0.5
+        for: 5m
+        labels:
+          severity: P1
+        annotations:
+          summary: "market Kafka 发布 p95 延迟过高：{{ $labels.topic }}"
+          description: "falconx_market_kafka_publish_duration p95（histogram_quantile）> 500ms 已持续 5 分钟（topic={{ $labels.topic }}）。"
+
+      # Kafka 发布失败（Counter 5 分钟增量 > 0）。
+      - alert: FalconxMarketKafkaPublishFailures
+        expr: increase(falconx_market_kafka_publish_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "market Kafka 发布失败：{{ $labels.topic }}"
+          description: "falconx_market_kafka_publish_failures_total 5 分钟窗口增量 > 0（topic={{ $labels.topic }}）。"
+
+  - name: falconx-market-websocket
+    rules:
+      # 待发送 buffer 接近容量水位（activeSessions * 512KiB * 0.8 = sessions * 419430 bytes）。
+      - alert: FalconxMarketWebSocketBufferHigh
+        expr: |
+          falconx_market_websocket_buffer_bytes
+            > falconx_market_websocket_sessions_active * 419430
+        for: 3m
+        labels:
+          severity: P1
+        annotations:
+          summary: "market WebSocket 待发送 buffer 接近容量"
+          description: "falconx_market_websocket_buffer_bytes 已超过 activeSessions×512KiB×0.8 持续 3 分钟，下游消费慢或会话堆积。"

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.FxPauseBehaviorMapper">
+
+    <!-- constructor <arg> 顺序必须与 FxPauseBehaviorRecord 组件顺序严格一致：
+         category, category_name, allow_open, allow_close, allow_liquidation。
+         allow_* 为 TINYINT(1/0)，映射为 Integer，1/0 → boolean 转换在 Repository toDomain。 -->
+    <resultMap id="fxPauseBehaviorRecordMap"
+               type="com.falconx.trading.repository.mapper.record.FxPauseBehaviorRecord">
+        <constructor>
+            <idArg column="category" javaType="java.lang.Integer"/>
+            <arg column="category_name" javaType="java.lang.String"/>
+            <arg column="allow_open" javaType="java.lang.Integer"/>
+            <arg column="allow_close" javaType="java.lang.Integer"/>
+            <arg column="allow_liquidation" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="fxPauseColumns">
+        category, category_name, allow_open, allow_close, allow_liquidation
+    </sql>
+
+    <select id="selectByCategory" resultMap="fxPauseBehaviorRecordMap">
+        SELECT <include refid="fxPauseColumns"/>
+        FROM t_fx_pause_behavior
+        WHERE category = #{category}
+    </select>
+
+    <select id="selectAll" resultMap="fxPauseBehaviorRecordMap">
+        SELECT <include refid="fxPauseColumns"/>
+        FROM t_fx_pause_behavior
+        ORDER BY category ASC
+    </select>
+
+    <!-- admin 写路径（绝对覆盖）；boolean → TINYINT(1/0) 走 MyBatis 默认 BooleanTypeHandler。
+         updated_at 由列 ON UPDATE CURRENT_TIMESTAMP 自动维护，不在此显式写。 -->
+    <update id="updateByCategory">
+        UPDATE t_fx_pause_behavior
+        SET allow_open = #{allowOpen},
+            allow_close = #{allowClose},
+            allow_liquidation = #{allowLiquidation},
+            updated_by_admin_id = #{adminUserId}
+        WHERE category = #{category}
+    </update>
+</mapper>

@@ -1,0 +1,164 @@
+spring:
+  # 2026-05-27 Sprint 6 顺序5：JDK 25 + Spring Boot 4 虚拟线程（Tomcat 请求 + @Async + @Scheduled）。
+  # JEP 491 已解决 synchronized pinning；自定义线程池（分区 executor/dispatcher/扫块 poller）不受影响仍用平台线程。
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: falconx-trading-core-service
+  datasource:
+    url: jdbc:mysql://${FALCONX_TRADING_DB_HOST:localhost}:${FALCONX_TRADING_DB_PORT:3306}/falconx_trading?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${FALCONX_TRADING_DB_USERNAME:root}
+    password: ${FALCONX_TRADING_DB_PASSWORD:root}
+    hikari:
+      # STAGE-12 perf：默认 HikariCP idleTimeout/maxLifetime 不主动 evict，
+      # 实测 MySQL processlist 多条 Sleep>16000s（4-7h）。显式收紧到 10min/30min。
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      keepalive-time: 300000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 关闭 ${var} 占位符替换 —— V22 通知模板 sql 用 ${variable} 作为业务模板占位符，
+    # Flyway 默认会把它当成 placeholder 抛 "No value provided for placeholder"。
+    placeholder-replacement: false
+  data:
+    redis:
+      host: ${FALCONX_REDIS_HOST:localhost}
+      port: ${FALCONX_REDIS_PORT:6380}
+  kafka:
+    bootstrap-servers: localhost:9092
+    listener:
+      missing-topics-fatal: false
+    consumer:
+      # 2026-05-26 Sprint 5 A2：latest → earliest，避免重启窗口期间消息丢失。
+      # 业务消费侧已用 inbox/CAS 幂等，重复消费安全；latest 在 group 首次启动会丢中间消息。
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # 2026-05-26 Sprint 5 A1：批量 + 压缩。
+      # batch.size = 16KB（默认），linger.ms = 10（聚合 10ms 内 send 一批）
+      # compression.type = lz4（CPU 友好，压缩比好；snappy 也是常见选择）
+      batch-size: 16384
+      properties:
+        linger.ms: 10
+        compression.type: lz4
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+
+server:
+  port: 18083
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level --- [%15.15t] [traceId=%X{traceId:-}] %logger{39} : %msg%n%ex"
+
+falconx:
+  trading:
+    settlement-token: USDT
+    # 入金 token 白名单：USDT 是 mainnet 真稳定币，USDC 是 Sepolia 测试用
+    # （账户按 USDT 计价，1:1 入账，非白名单 token 一律拒收避免 ETH/BNB 1:1 误收）
+    deposit-token-whitelist:
+      - USDT
+      - USDC
+    default-fee-rate: 0.0005
+    maintenance-margin-rate: 0.005
+    max-leverage: 100
+    cache:
+      quote-ttl: 10s
+    swap:
+      enabled: true
+      # 2026-05-26 Sprint 5 B4：原 "*/1 * * * * *" 每秒全表扫 t_position，性能浪费。
+      # Swap 业务上每小时（或每天）结算，秒级精度无意义；改为 "*/10 * * * * *" 每 10s 扫一次，
+      # 仍能在 10s 内捕捉到结算时刻，CPU/MySQL load -90%。
+      settlement-cron: "*/10 * * * * *"
+      settlement-zone: UTC
+    kafka:
+      market-price-tick-topic: falconx.market.price.tick
+      market-price-tick-worker-count: 4
+      market-kline-update-topic: falconx.market.kline.update
+      wallet-deposit-confirmed-topic: falconx.wallet.deposit.confirmed
+      wallet-deposit-reversed-topic: falconx.wallet.deposit.reversed
+      deposit-credited-topic: falconx.trading.deposit.credited
+      consumer-group-id: falconx-trading-core-service
+      # STAGE-6-KYC Phase 4：消费 identity KYC 审核完成事件 → t_notification 站内信
+      kyc-reviewed-topic: falconx.identity.kyc.reviewed
+      kyc-reviewed-consumer-group-id: falconx.trading-core-service.kyc-reviewed-consumer-group
+      # STAGE-7-WITHDRAW Phase 3：消费 wallet 端 3 个出金事件
+      wallet-withdraw-broadcast-topic: falconx.wallet.withdraw.broadcast
+      wallet-withdraw-broadcast-consumer-group-id: falconx.trading-core-service.wallet-withdraw-broadcast-consumer-group
+      wallet-withdraw-confirmed-topic: falconx.wallet.withdraw.confirmed
+      wallet-withdraw-confirmed-consumer-group-id: falconx.trading-core-service.wallet-withdraw-confirmed-consumer-group
+      wallet-withdraw-failed-topic: falconx.wallet.withdraw.failed
+      wallet-withdraw-failed-consumer-group-id: falconx.trading-core-service.wallet-withdraw-failed-consumer-group
+    # 2026-05-26 Sprint 3 S6（性能报告 §6 P0）：持仓平仓单事务跨 7 张表 → 拆分。
+    # 主事务保留强一致 5 项（t_account/t_ledger/t_position/t_risk_exposure/t_outbox），
+    # t_trade/t_liquidation_log/级联撤 SL_TP 走 outbox post-process 异步消费。
+    position-close:
+      async-post-process:
+        enabled: true
+      post-process:
+        topic: falconx.trading.position.close.post-process
+        consumer-group-id: falconx.trading-core-service.position-close-post-process-consumer-group
+    # STAGE-2-CUSTOMER 内部 RPC 鉴权 token：gateway 注入 X-Internal-Token，trading-core filter 校验
+    internal-api:
+      token: ${FALCONX_INTERNAL_API_TOKEN:falconx-internal-dev-token}
+    # STAGE-7-WITHDRAW：trading-core 调外部服务（identity / wallet）internal RPC
+    external-rpc:
+      gateway-base-url: ${FALCONX_GATEWAY_BASE_URL:http://localhost:18080}
+      connect-timeout: 2s
+      read-timeout: 5s
+      service-caller-id: 0
+    # STAGE-14B Task 3：market FX 数据消费配置
+    fx:
+      market-rpc-url: ${FALCONX_GATEWAY_BASE_URL:http://localhost:18080}
+      fx-rate-update-topic: falconx.market.fx.rate.update
+      consumer-group-id: falconx-trading-fx-rate
+      bootstrap-failure-policy: warn
+    # STAGE-14C1 Task 5：杠杆/MM 档位本地缓存（TTL=30s；惰性过期重查；DB 查空降级 empty → 30072）
+    tier:
+      cache-refresh-seconds: 30
+    # STAGE-14C2 Task 5：FX_PAUSED 类目行为开关全量本地缓存（8 行；TTL=60s；惰性过期整表重查；
+    # 缓存内无该 category 降级 empty → Task 6 allow_all）
+    fx-pause:
+      cache-refresh-seconds: 60
+    # STAGE-14D1 Task 3：用户级 margin mode 切换冷静期（默认 5min；切换后 mode_cooling_until=now+本值；
+    # 冷静期内重复切换拒 30082；admin 可配 60s-7d 留 D3 console 配置 UI）
+    margin-mode:
+      cooling-duration: 5m
+    # STAGE-7-WITHDRAW：出金参数
+    withdraw:
+      single-limit-usd: 10000
+      daily-limit-usd: 30000
+      min-amount: 10
+      delayed-amount-threshold-usd: 3000
+      cooling-duration: 2h
+      delayed-duration: 6h
+      whitelist-cooling-duration: 24h
+
+# STAGE-11-OBS-RECON §14.5 actuator endpoints（运维 / canary / k8s probe 用，不暴露给前端）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers,prometheus,threaddump,heapdump
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+    loggers:
+      enabled: true
+  info:
+    git:
+      mode: simple
+    build:
+      enabled: true

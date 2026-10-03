@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.wallet.repository.mapper.WalletWithdrawWhitelistMapper">
+
+    <resultMap id="recordMap" type="com.falconx.wallet.repository.mapper.record.WalletWithdrawWhitelistRecord">
+        <constructor>
+            <idArg column="id"            javaType="java.lang.Long"/>
+            <arg   column="user_id"       javaType="java.lang.Long"/>
+            <arg   column="network"       javaType="java.lang.String"/>
+            <arg   column="address"       javaType="java.lang.String"/>
+            <arg   column="label"         javaType="java.lang.String"/>
+            <arg   column="status"        javaType="java.lang.Integer"/>
+            <arg   column="activated_at"  javaType="java.time.LocalDateTime"/>
+            <arg   column="removed_at"    javaType="java.time.LocalDateTime"/>
+            <arg   column="created_at"    javaType="java.time.LocalDateTime"/>
+            <arg   column="updated_at"    javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="cols">
+        id, user_id, network, address, label, status, activated_at, removed_at, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.falconx.wallet.repository.mapper.record.WalletWithdrawWhitelistRecord">
+        INSERT INTO t_withdraw_whitelist (<include refid="cols"/>) VALUES (
+            #{id}, #{userId}, #{network}, #{address}, #{label}, #{status},
+            #{activatedAt}, #{removedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_withdraw_whitelist WHERE id = #{id}
+    </select>
+
+    <select id="selectActiveByUserId" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_withdraw_whitelist
+        WHERE user_id = #{userId} AND status &lt;&gt; 2
+        ORDER BY created_at DESC, id DESC
+    </select>
+
+    <select id="countActiveByUserId" resultType="int">
+        SELECT COUNT(1) FROM t_withdraw_whitelist WHERE user_id = #{userId} AND status = 1
+    </select>
+
+    <select id="selectByUserNetworkAddressActive" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_withdraw_whitelist
+        WHERE user_id = #{userId} AND network = #{network} AND address = #{address}
+          AND status IN (0, 1)
+        LIMIT 1
+    </select>
+
+    <update id="markRemoved">
+        UPDATE t_withdraw_whitelist
+        SET status = 2, removed_at = CURRENT_TIMESTAMP(3), updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{id} AND status IN (0, 1)
+    </update>
+
+    <!-- 已过 24h 冷静期的 PENDING：created_at + 24h <= threshold（threshold = now） -->
+    <select id="selectExpiredPendingWhitelists" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_withdraw_whitelist
+        WHERE status = 0 AND created_at &lt;= #{threshold}
+        ORDER BY created_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- CAS：PENDING(0) → ACTIVE(1) + activated_at -->
+    <update id="markActiveFromPendingAtomic">
+        UPDATE t_withdraw_whitelist
+        SET status = 1, activated_at = #{activatedAt}, updated_at = #{activatedAt}
+        WHERE id = #{id} AND status = 0
+    </update>
+
+</mapper>

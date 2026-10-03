@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingWithdrawOrderMapper">
+
+    <resultMap id="recordMap" type="com.falconx.trading.repository.mapper.record.TradingWithdrawOrderRecord">
+        <constructor>
+            <idArg column="id"                          javaType="java.lang.Long"/>
+            <arg   column="user_id"                     javaType="java.lang.Long"/>
+            <arg   column="amount"                      javaType="java.math.BigDecimal"/>
+            <arg   column="currency"                    javaType="java.lang.String"/>
+            <arg   column="network"                     javaType="java.lang.String"/>
+            <arg   column="target_address"              javaType="java.lang.String"/>
+            <arg   column="whitelist_id"                javaType="java.lang.Long"/>
+            <arg   column="status"                      javaType="java.lang.Integer"/>
+            <arg   column="cooling_until"               javaType="java.time.LocalDateTime"/>
+            <arg   column="delayed_until"               javaType="java.time.LocalDateTime"/>
+            <arg   column="processing_started_at"       javaType="java.time.LocalDateTime"/>
+            <arg   column="reviewer_id"                 javaType="java.lang.Long"/>
+            <arg   column="review_at"                   javaType="java.time.LocalDateTime"/>
+            <arg   column="review_note"                 javaType="java.lang.String"/>
+            <arg   column="reject_reason"               javaType="java.lang.String"/>
+            <arg   column="tx_hash"                     javaType="java.lang.String"/>
+            <arg   column="confirmations"               javaType="java.lang.Integer"/>
+            <arg   column="failure_code"                javaType="java.lang.String"/>
+            <arg   column="failure_reason"              javaType="java.lang.String"/>
+            <arg   column="idempotency_key"             javaType="java.lang.String"/>
+            <arg   column="daily_amount_usd_snapshot"   javaType="java.math.BigDecimal"/>
+            <arg   column="created_at"                  javaType="java.time.LocalDateTime"/>
+            <arg   column="updated_at"                  javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="cols">
+        id, user_id, amount, currency, network, target_address, whitelist_id,
+        status, cooling_until, delayed_until, processing_started_at,
+        reviewer_id, review_at, review_note, reject_reason,
+        tx_hash, confirmations, failure_code, failure_reason,
+        idempotency_key, daily_amount_usd_snapshot, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.falconx.trading.repository.mapper.record.TradingWithdrawOrderRecord">
+        INSERT INTO t_withdraw_order (<include refid="cols"/>) VALUES (
+            #{id}, #{userId}, #{amount}, #{currency}, #{network}, #{targetAddress}, #{whitelistId},
+            #{status}, #{coolingUntil}, #{delayedUntil}, #{processingStartedAt},
+            #{reviewerId}, #{reviewAt}, #{reviewNote}, #{rejectReason},
+            #{txHash}, #{confirmations}, #{failureCode}, #{failureReason},
+            #{idempotencyKey}, #{dailyAmountUsdSnapshot}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_withdraw_order WHERE id = #{id}
+    </select>
+
+    <!--
+        幂等查询带 24h TTL（2026-05-20 加固）：
+        客户端 idempotencyKey 通常是请求范围内的 UUID（重试窗口最长 ~分钟级）；
+        若 30 天后客户端 bug 重用同一 key，原实现会返回历史成功单导致用户误判甚至给错账户
+        入账。这里强制只匹配 24h 内的记录，超时的同 key 提交按"新单"走（INSERT 阶段若仍命中
+        UNIQUE(user_id, idempotency_key) 会抛 DuplicateKeyException 让上层显式拒绝）。
+        TTL 24h 对正常网络重试场景充分够用（实际几秒到几分钟）。
+    -->
+    <select id="selectByUserIdAndIdempotencyKey" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_withdraw_order
+        WHERE user_id = #{userId}
+          AND idempotency_key = #{idempotencyKey}
+          AND created_at &gt; (NOW() - INTERVAL 1 DAY)
+    </select>
+
+    <select id="selectByUserId" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_withdraw_order
+        WHERE user_id = #{userId}
+        <if test="status != null">AND status = #{status}</if>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(1) FROM t_withdraw_order
+        WHERE user_id = #{userId}
+        <if test="status != null">AND status = #{status}</if>
+    </select>
+
+    <!-- 单日累计：当日创建的 COOLING(0)/PENDING(1)/APPROVED(2)/APPROVED_DELAYED(3)/PROCESSING(4)/COMPLETED(5) 都计入；
+         FAILED(6)/CANCELED(7)/REJECTED(8) 已退冻，不计入单日上限 -->
+    <select id="sumActiveAmountForUserOnDay" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM t_withdraw_order
+        WHERE user_id = #{userId}
+          AND created_at &gt;= #{dayStartUtc}
+          AND created_at &lt; #{dayEndUtc}
+          AND status IN (0, 1, 2, 3, 4, 5)
+    </select>
+
+    <!-- 用户冷静期取消 CAS：要求 status=0(COOLING) + user_id 匹配 -->
+    <update id="markCanceledByUserAtomic">
+        UPDATE t_withdraw_order
+        SET status = 7, updated_at = #{updatedAt}
+        WHERE id = #{id} AND user_id = #{userId} AND status = 0
+    </update>
+
+    <!-- 扫描已过冷静期的 COOLING 记录（status=0 AND cooling_until <= now），最多 limit 条 -->
+    <select id="selectExpiredCoolingOrders" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_withdraw_order
+        WHERE status = 0 AND cooling_until &lt;= #{now}
+        ORDER BY cooling_until ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- CAS：COOLING(0) → PENDING(1) -->
+    <update id="markPendingFromCoolingAtomic">
+        UPDATE t_withdraw_order
+        SET status = 1, updated_at = #{updatedAt}
+        WHERE id = #{id} AND status = 0
+    </update>
+
+    <!-- admin 列表：默认按 PENDING(1) 优先 + APPROVED_DELAYED(3) 次优先 + 其余按 created_at DESC -->
+    <select id="selectAdminPaginated" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_withdraw_order
+        <where>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="network != null and network != ''">AND network = #{network}</if>
+            <if test="minAmount != null">AND amount &gt;= #{minAmount}</if>
+        </where>
+        ORDER BY
+            CASE status WHEN 1 THEN 0 WHEN 3 THEN 1 ELSE 2 END ASC,
+            created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminFiltered" resultType="long">
+        SELECT COUNT(1) FROM t_withdraw_order
+        <where>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="network != null and network != ''">AND network = #{network}</if>
+            <if test="minAmount != null">AND amount &gt;= #{minAmount}</if>
+        </where>
+    </select>
+
+    <!-- admin approve CAS：PENDING(1) → APPROVED(2) 或 APPROVED_DELAYED(3) -->
+    <update id="markReviewedFromPendingAtomic">
+        UPDATE t_withdraw_order
+        SET status = #{nextStatus},
+            reviewer_id = #{reviewerId},
+            review_at = #{reviewAt},
+            review_note = #{reviewNote},
+            delayed_until = #{delayedUntil},
+            updated_at = #{reviewAt}
+        WHERE id = #{id} AND status = 1
+    </update>
+
+    <!-- admin reject CAS：PENDING(1) → REJECTED(8) -->
+    <update id="markRejectedFromPendingAtomic">
+        UPDATE t_withdraw_order
+        SET status = 8,
+            reviewer_id = #{reviewerId},
+            review_at = #{reviewAt},
+            reject_reason = #{rejectReason},
+            updated_at = #{reviewAt}
+        WHERE id = #{id} AND status = 1
+    </update>
+
+    <!-- admin emergency-cancel CAS：APPROVED_DELAYED(3) → CANCELED(7) -->
+    <update id="markCanceledByAdminAtomic">
+        UPDATE t_withdraw_order
+        SET status = 7,
+            reviewer_id = #{reviewerId},
+            review_at = #{reviewAt},
+            reject_reason = #{rejectReason},
+            updated_at = #{reviewAt}
+        WHERE id = #{id} AND status = 3
+    </update>
+
+    <!-- 扫描已过大额延迟期的 APPROVED_DELAYED 记录 -->
+    <select id="selectExpiredDelayedOrders" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_withdraw_order
+        WHERE status = 3 AND delayed_until &lt;= #{now}
+        ORDER BY delayed_until ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- CAS：APPROVED_DELAYED(3) → APPROVED(2) -->
+    <update id="markApprovedFromDelayedAtomic">
+        UPDATE t_withdraw_order
+        SET status = 2, updated_at = #{updatedAt}
+        WHERE id = #{id} AND status = 3
+    </update>
+
+    <!-- STAGE-7-WITHDRAW Phase 3：APPROVED(2) → PROCESSING(4) + tx_hash -->
+    <update id="markProcessingFromApprovedAtomic">
+        UPDATE t_withdraw_order
+        SET status = 4,
+            tx_hash = #{txHash},
+            processing_started_at = #{processingStartedAt},
+            updated_at = #{processingStartedAt}
+        WHERE id = #{id} AND status = 2
+    </update>
+
+    <!-- STAGE-7-WITHDRAW Phase 3：PROCESSING(4) → COMPLETED(5) -->
+    <update id="markCompletedFromProcessingAtomic">
+        UPDATE t_withdraw_order
+        SET status = 5,
+            confirmations = #{confirmations},
+            updated_at = #{updatedAt}
+        WHERE id = #{id} AND status = 4
+    </update>
+
+    <!-- STAGE-7-WITHDRAW Phase 3：APPROVED(2) / APPROVED_DELAYED(3) / PROCESSING(4) → FAILED(6) -->
+    <update id="markFailedAtomic">
+        UPDATE t_withdraw_order
+        SET status = 6,
+            failure_code = #{failureCode},
+            failure_reason = #{failureReason},
+            updated_at = #{updatedAt}
+        WHERE id = #{id} AND status IN (2, 3, 4)
+    </update>
+
+</mapper>

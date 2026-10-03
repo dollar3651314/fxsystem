@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingRiskExposureMapper">
+
+    <resultMap id="tradingRiskExposureRecordMap" type="com.falconx.trading.repository.mapper.record.TradingRiskExposureRecord">
+        <constructor>
+            <idArg column="symbol" javaType="java.lang.String"/>
+            <arg column="total_long_qty" javaType="java.math.BigDecimal"/>
+            <arg column="total_short_qty" javaType="java.math.BigDecimal"/>
+            <arg column="net_exposure" javaType="java.math.BigDecimal"/>
+            <arg column="net_exposure_usd" javaType="java.math.BigDecimal"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="applyLongDelta">
+        INSERT INTO t_risk_exposure (
+            symbol,
+            total_long_qty,
+            total_short_qty,
+            net_exposure,
+            net_exposure_usd,
+            updated_at
+        ) VALUES (
+            #{symbol},
+            #{quantity},
+            0,
+            #{quantity},
+            #{quantity} * #{markPrice},
+            #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            total_long_qty = total_long_qty + VALUES(total_long_qty),
+            net_exposure = total_long_qty - total_short_qty,
+            net_exposure_usd = (total_long_qty - total_short_qty) * #{markPrice},
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <insert id="applyShortDelta">
+        INSERT INTO t_risk_exposure (
+            symbol,
+            total_long_qty,
+            total_short_qty,
+            net_exposure,
+            net_exposure_usd,
+            updated_at
+        ) VALUES (
+            #{symbol},
+            0,
+            #{quantity},
+            -#{quantity},
+            -#{quantity} * #{markPrice},
+            #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            total_short_qty = total_short_qty + VALUES(total_short_qty),
+            net_exposure = total_long_qty - total_short_qty,
+            net_exposure_usd = (total_long_qty - total_short_qty) * #{markPrice},
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <update id="reduceLongDelta">
+        UPDATE t_risk_exposure
+        SET total_long_qty = total_long_qty - #{quantity},
+            net_exposure = total_long_qty - total_short_qty,
+            net_exposure_usd = (total_long_qty - total_short_qty) * #{markPrice},
+            updated_at = #{updatedAt}
+        WHERE symbol = #{symbol}
+          AND total_long_qty >= #{quantity}
+    </update>
+
+    <update id="reduceShortDelta">
+        UPDATE t_risk_exposure
+        SET total_short_qty = total_short_qty - #{quantity},
+            net_exposure = total_long_qty - total_short_qty,
+            net_exposure_usd = (total_long_qty - total_short_qty) * #{markPrice},
+            updated_at = #{updatedAt}
+        WHERE symbol = #{symbol}
+          AND total_short_qty >= #{quantity}
+    </update>
+
+    <update id="refreshNetExposureUsd">
+        <!-- 多币种 USD 化（2026-06-03）：×fx(QC→USD)，由 Java 侧保证 fxRate 非空（缺失降级 1）。
+             apply/reduce delta 语句的 usd 计算为同事务内临时值，随后必被本语句覆盖，故只改此处。 -->
+        UPDATE t_risk_exposure
+        SET net_exposure_usd = (CASE
+                                   WHEN net_exposure &lt; 0 THEN net_exposure * #{askPrice}
+                                   ELSE net_exposure * #{bidPrice}
+            END) * #{fxRate},
+            updated_at = #{updatedAt}
+        WHERE symbol = #{symbol}
+    </update>
+
+    <select id="selectBySymbol" resultMap="tradingRiskExposureRecordMap">
+        SELECT symbol,
+               total_long_qty,
+               total_short_qty,
+               net_exposure,
+               net_exposure_usd,
+               updated_at
+        FROM t_risk_exposure
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="selectBySymbols" resultMap="tradingRiskExposureRecordMap">
+        SELECT symbol,
+               total_long_qty,
+               total_short_qty,
+               net_exposure,
+               net_exposure_usd,
+               updated_at
+        FROM t_risk_exposure
+        WHERE symbol IN
+        <foreach collection="symbols" item="symbol" open="(" separator="," close=")">
+            #{symbol}
+        </foreach>
+    </select>
+
+    <select id="sumAbsNetExposureUsdByMarketCode" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(ABS(e.net_exposure_usd)), 0)
+        FROM t_risk_exposure e
+        INNER JOIN t_risk_config c ON c.symbol = e.symbol
+        WHERE c.market_code = #{marketCode}
+    </select>
+
+    <!-- BBOOK-RISK-CONTROL-01: 平台总敞口（全 symbol 累计） -->
+    <select id="sumAbsNetExposureUsdAllSymbols" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(ABS(net_exposure_usd)), 0) FROM t_risk_exposure
+    </select>
+
+    <select id="selectAdminAll" resultMap="tradingRiskExposureRecordMap">
+        SELECT symbol,
+               total_long_qty,
+               total_short_qty,
+               net_exposure,
+               net_exposure_usd,
+               updated_at
+        FROM t_risk_exposure
+        <where>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+        </where>
+        ORDER BY ABS(net_exposure_usd) DESC, symbol ASC
+    </select>
+</mapper>

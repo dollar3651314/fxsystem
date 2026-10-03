@@ -1,0 +1,23 @@
+# 后端通用 Dockerfile：6 个 Spring Boot 服务共用
+# 用法：docker build --build-arg JAR_PATH=falconx-identity-service/target/falconx-identity-service-1.0.0-SNAPSHOT.jar -f deploy/docker/Dockerfile.backend -t falconx-identity-service:demo .
+
+FROM eclipse-temurin:25-jre
+
+WORKDIR /app
+
+ARG JAR_PATH
+COPY ${JAR_PATH} /app/app.jar
+
+# truststore（market 用 LP 自签证书 / wallet 用代理证书）；公网部署用 JDK 默认 cacerts 时这俩不被引用，多带无害
+COPY tools/lp-truststore.p12 /app/tools/lp-truststore.p12
+COPY tools/wallet-truststore.p12 /app/tools/wallet-truststore.p12
+
+# 通用 entrypoint：自动按容器 hostname 隔离 heap dump / GC log，OOM 自动 dump 并强杀（compose 拉起新容器）
+COPY deploy/docker/backend-entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# JVM 业务参数由 compose 注入；默认走 G1 + 512m heap
+ENV JAVA_OPTS="-XX:+UseG1GC -Xmx512m"
+ENV SPRING_PROFILES_ACTIVE=dev
+
+ENTRYPOINT ["/app/entrypoint.sh"]

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.identity.repository.mapper.IdentityUserProfileMapper">
+
+    <resultMap id="userProfileRecordMap" type="com.falconx.identity.repository.mapper.record.IdentityUserProfileRecord">
+        <constructor>
+            <idArg column="user_id" javaType="java.lang.Long"/>
+            <arg column="first_name" javaType="java.lang.String"/>
+            <arg column="middle_name" javaType="java.lang.String"/>
+            <arg column="last_name" javaType="java.lang.String"/>
+            <arg column="birth_date" javaType="java.time.LocalDate"/>
+            <arg column="nationality" javaType="java.lang.String"/>
+            <arg column="gender" javaType="java.lang.Integer"/>
+            <arg column="residence_country" javaType="java.lang.String"/>
+            <arg column="residence_state" javaType="java.lang.String"/>
+            <arg column="residence_city" javaType="java.lang.String"/>
+            <arg column="residence_address" javaType="java.lang.String"/>
+            <arg column="residence_postal_code" javaType="java.lang.String"/>
+            <arg column="phone_country_code" javaType="java.lang.String"/>
+            <arg column="phone_number" javaType="java.lang.String"/>
+            <arg column="language_preference" javaType="java.lang.String"/>
+            <arg column="timezone" javaType="java.lang.String"/>
+            <arg column="profile_verified" javaType="java.lang.Integer"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByUserId" resultMap="userProfileRecordMap">
+        SELECT user_id, first_name, middle_name, last_name, birth_date, nationality,
+               gender, residence_country, residence_state, residence_city,
+               residence_address, residence_postal_code, phone_country_code, phone_number,
+               language_preference, timezone, profile_verified, created_at, updated_at
+        FROM t_user_profile
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="insertProfile">
+        INSERT INTO t_user_profile (
+            user_id, first_name, middle_name, last_name, birth_date, nationality,
+            language_preference, timezone
+        ) VALUES (
+            #{userId}, #{firstName}, #{middleName}, #{lastName}, #{birthDate}, #{nationality},
+            COALESCE(#{languagePreference}, 'zh-CN'),
+            COALESCE(#{timezone}, 'Asia/Shanghai')
+        )
+    </insert>
+
+    <update id="updateMandatoryFields">
+        UPDATE t_user_profile
+        SET first_name = #{firstName},
+            middle_name = #{middleName},
+            last_name = #{lastName},
+            birth_date = #{birthDate},
+            nationality = #{nationality}
+        WHERE user_id = #{userId} AND profile_verified = 0
+    </update>
+
+    <update id="updateOptionalFields">
+        UPDATE t_user_profile
+        SET gender = #{gender},
+            residence_country = #{residenceCountry},
+            residence_state = #{residenceState},
+            residence_city = #{residenceCity},
+            residence_address = #{residenceAddress},
+            residence_postal_code = #{residencePostalCode},
+            phone_country_code = #{phoneCountryCode},
+            phone_number = #{phoneNumber},
+            language_preference = COALESCE(#{languagePreference}, language_preference),
+            timezone = COALESCE(#{timezone}, timezone)
+        WHERE user_id = #{userId}
+    </update>
+
+    <update id="updateProfileVerified">
+        UPDATE t_user_profile SET profile_verified = #{verified} WHERE user_id = #{userId}
+    </update>
+
+    <!--
+      管理端 patch profile：全部 16 字段都允许 null（COALESCE 保留原值）。
+      与用户自己的 updateMandatoryFields 不同：
+        1. 不带 WHERE profile_verified = 0 — 管理员可覆盖 verified 锁
+        2. 不强制 5 强制字段（任一字段都可独立更新）
+        3. 不更新 profile_verified 标记（管理员改名不应触发"已认证"误判）
+    -->
+    <update id="updateProfileByAdmin">
+        UPDATE t_user_profile
+        SET first_name             = COALESCE(#{firstName}, first_name),
+            middle_name            = COALESCE(#{middleName}, middle_name),
+            last_name              = COALESCE(#{lastName}, last_name),
+            birth_date             = COALESCE(#{birthDate}, birth_date),
+            nationality            = COALESCE(#{nationality}, nationality),
+            gender                 = COALESCE(#{gender}, gender),
+            residence_country      = COALESCE(#{residenceCountry}, residence_country),
+            residence_state        = COALESCE(#{residenceState}, residence_state),
+            residence_city         = COALESCE(#{residenceCity}, residence_city),
+            residence_address      = COALESCE(#{residenceAddress}, residence_address),
+            residence_postal_code  = COALESCE(#{residencePostalCode}, residence_postal_code),
+            phone_country_code     = COALESCE(#{phoneCountryCode}, phone_country_code),
+            phone_number           = COALESCE(#{phoneNumber}, phone_number),
+            language_preference    = COALESCE(#{languagePreference}, language_preference),
+            timezone               = COALESCE(#{timezone}, timezone)
+        WHERE user_id = #{userId}
+    </update>
+
+</mapper>

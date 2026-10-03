@@ -1,0 +1,90 @@
+/* FalconX H5 — 客户端 P1 features mobile 适配
+ * 桌面 (≥ 768px) 保持原样。Mobile (< 768px) 补 DashboardPage + ActivityPage tabs + profile-form。
+ */
+
+@media (max-width: 767px) {
+  /* ============ DashboardPage layout ============ */
+  .dashboard-page {
+    padding: 0 16px;
+  }
+
+  .dashboard-page__console-route {
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-page__hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 0;
+  }
+
+  .dashboard-page__hero-sub {
+    font-size: 13px;
+  }
+
+  .dashboard-page__hero-actions {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+
+  .dashboard-page__hero-actions .fx-btn-secondary,
+  .dashboard-page__hero-actions .fx-btn-primary {
+    flex: 1;
+    min-height: 40px;
+  }
+
+  /* dashboard-stat-grid mobile 1 列 */
+  .dashboard-stat-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .dashboard-stat-card {
+    padding: 12px;
+  }
+
+  .dashboard-stat-card__label {
+    font-size: 11px;
+  }
+
+  .dashboard-stat-card__value {
+    font-size: 18px;
+  }
+
+  /* ============ ActivityPage tabs 横滚 + 隐 __num ============ */
+  .activity-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .activity-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .activity-tab {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .activity-tab__num {
+    display: none;
+  }
+
+  /* ============ profile-form mobile (Kyc + Profile 共享) ============ */
+  .profile-form input,
+  .profile-form select,
+  .profile-form textarea {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .profile-form textarea {
+    min-height: 80px;
+  }
+}

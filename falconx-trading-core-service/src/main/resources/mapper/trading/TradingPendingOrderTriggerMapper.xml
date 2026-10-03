@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingPendingOrderTriggerMapper">
+
+    <resultMap id="recordMap" type="com.falconx.trading.repository.mapper.record.TradingPendingOrderTriggerRecord">
+        <constructor>
+            <idArg column="id"                javaType="java.lang.Long"/>
+            <arg   column="order_no"          javaType="java.lang.String"/>
+            <arg   column="user_id"           javaType="java.lang.Long"/>
+            <arg   column="group_code_at_create" javaType="java.lang.String"/>
+            <arg   column="bid_extra_at_create"  javaType="java.math.BigDecimal"/>
+            <arg   column="ask_extra_at_create"  javaType="java.math.BigDecimal"/>
+            <arg   column="symbol"            javaType="java.lang.String"/>
+            <arg   column="order_type"        javaType="java.lang.Integer"/>
+            <arg   column="side"              javaType="java.lang.Integer"/>
+            <arg   column="quantity"          javaType="java.math.BigDecimal"/>
+            <arg   column="trigger_price"     javaType="java.math.BigDecimal"/>
+            <arg   column="limit_price"       javaType="java.math.BigDecimal"/>
+            <arg   column="leverage"          javaType="java.math.BigDecimal"/>
+            <arg   column="margin_mode"       javaType="java.lang.Integer"/>
+            <arg   column="frozen_margin"     javaType="java.math.BigDecimal"/>
+            <arg   column="frozen_fee"        javaType="java.math.BigDecimal"/>
+            <arg   column="status"            javaType="java.lang.Integer"/>
+            <arg   column="parent_position_id" javaType="java.lang.Long"/>
+            <arg   column="trigger_kind"      javaType="java.lang.Integer"/>
+            <arg   column="client_order_id"   javaType="java.lang.String"/>
+            <arg   column="triggered_order_id" javaType="java.lang.Long"/>
+            <arg   column="triggered_at"      javaType="java.time.LocalDateTime"/>
+            <arg   column="cancelled_at"      javaType="java.time.LocalDateTime"/>
+            <arg   column="cancel_reason"     javaType="java.lang.String"/>
+            <arg   column="created_at"        javaType="java.time.LocalDateTime"/>
+            <arg   column="updated_at"        javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="cols">
+        id, order_no, user_id,
+        group_code_at_create, bid_extra_at_create, ask_extra_at_create,
+        symbol, order_type, side, quantity,
+        trigger_price, limit_price, leverage, margin_mode,
+        frozen_margin, frozen_fee, status,
+        parent_position_id, trigger_kind, client_order_id, triggered_order_id,
+        triggered_at, cancelled_at, cancel_reason, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.falconx.trading.repository.mapper.record.TradingPendingOrderTriggerRecord">
+        INSERT INTO t_pending_order_trigger (<include refid="cols"/>) VALUES (
+            #{id}, #{orderNo}, #{userId},
+            #{groupCodeAtCreate}, #{bidExtraAtCreate}, #{askExtraAtCreate},
+            #{symbol}, #{orderType}, #{side}, #{quantity},
+            #{triggerPrice}, #{limitPrice}, #{leverage}, #{marginMode},
+            #{frozenMargin}, #{frozenFee}, #{status},
+            #{parentPositionId}, #{triggerKind}, #{clientOrderId}, #{triggeredOrderId},
+            #{triggeredAt}, #{cancelledAt}, #{cancelReason}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_pending_order_trigger WHERE id = #{id}
+    </select>
+
+    <select id="selectByIdForUpdate" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_pending_order_trigger WHERE id = #{id} FOR UPDATE
+    </select>
+
+    <select id="selectPendingBySymbol" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_pending_order_trigger
+        WHERE symbol = #{symbol} AND status = 1
+        ORDER BY created_at ASC, id ASC
+    </select>
+
+    <select id="selectPendingSymbols" resultType="string">
+        SELECT DISTINCT symbol
+        FROM t_pending_order_trigger
+        WHERE status = 1
+    </select>
+
+    <select id="countPendingBySymbol" resultType="long">
+        SELECT COUNT(1)
+        FROM t_pending_order_trigger
+        WHERE symbol = #{symbol} AND status = 1
+    </select>
+
+    <select id="selectUserOpeningPending" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_pending_order_trigger
+        WHERE user_id = #{userId} AND order_type != 5
+        <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+        <if test="status != null">AND status = #{status}</if>
+        <if test="status == null">AND status = 1</if>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countUserOpeningPending" resultType="long">
+        SELECT COUNT(1) FROM t_pending_order_trigger
+        WHERE user_id = #{userId} AND order_type != 5
+        <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+        <if test="status != null">AND status = #{status}</if>
+        <if test="status == null">AND status = 1</if>
+    </select>
+
+    <select id="selectSlTpByPositionId" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_pending_order_trigger
+        WHERE parent_position_id = #{positionId}
+          AND order_type = 5
+          AND status = 1
+        ORDER BY trigger_kind ASC
+    </select>
+
+    <select id="selectAdminPaginated" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_pending_order_trigger
+        <where>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="!includeSlTp">AND order_type != 5</if>
+        </where>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminFiltered" resultType="long">
+        SELECT COUNT(1) FROM t_pending_order_trigger
+        <where>
+            <if test="userId != null">AND user_id = #{userId}</if>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="!includeSlTp">AND order_type != 5</if>
+        </where>
+    </select>
+
+    <update id="updateStatusAtomic">
+        UPDATE t_pending_order_trigger
+        SET status            = #{toStatus},
+            triggered_order_id = #{triggeredOrderId},
+            triggered_at      = #{triggeredAt},
+            cancelled_at      = #{cancelledAt},
+            cancel_reason     = #{cancelReason},
+            updated_at        = #{updatedAt}
+        WHERE id = #{id} AND status = #{fromStatus}
+    </update>
+
+    <update id="updateTriggerPrices">
+        UPDATE t_pending_order_trigger
+        SET trigger_price = #{triggerPrice},
+            limit_price   = #{limitPrice},
+            quantity      = #{quantity},
+            updated_at    = #{updatedAt}
+        WHERE id = #{id} AND status = 1
+    </update>
+
+    <update id="cancelSlTpByPositionId">
+        UPDATE t_pending_order_trigger
+        SET status        = 3,
+            cancelled_at  = #{updatedAt},
+            cancel_reason = #{cancelReason},
+            updated_at    = #{updatedAt}
+        WHERE parent_position_id = #{positionId}
+          AND order_type = 5
+          AND trigger_kind = #{triggerKind}
+          AND status = 1
+    </update>
+
+    <update id="cancelAllSlTpByPositionId">
+        UPDATE t_pending_order_trigger
+        SET status        = 3,
+            cancelled_at  = #{updatedAt},
+            cancel_reason = #{cancelReason},
+            updated_at    = #{updatedAt}
+        WHERE parent_position_id = #{positionId}
+          AND order_type = 5
+          AND status = 1
+    </update>
+
+</mapper>

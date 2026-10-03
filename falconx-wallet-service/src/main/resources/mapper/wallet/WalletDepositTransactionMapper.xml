@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.wallet.repository.mapper.WalletDepositTransactionMapper">
+
+    <resultMap id="walletDepositTransactionRecordMap" type="com.falconx.wallet.repository.mapper.record.WalletDepositTransactionRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="user_id" javaType="java.lang.Long"/>
+            <arg column="chain" javaType="java.lang.String"/>
+            <arg column="token" javaType="java.lang.String"/>
+            <arg column="token_contract_address" javaType="java.lang.String"/>
+            <arg column="tx_hash" javaType="java.lang.String"/>
+            <arg column="log_index" javaType="java.lang.Integer"/>
+            <arg column="from_address" javaType="java.lang.String"/>
+            <arg column="to_address" javaType="java.lang.String"/>
+            <arg column="amount" javaType="java.math.BigDecimal"/>
+            <arg column="block_number" javaType="java.lang.Long"/>
+            <arg column="confirmations" javaType="java.lang.Integer"/>
+            <arg column="required_confirms" javaType="java.lang.Integer"/>
+            <arg column="status" javaType="java.lang.Integer"/>
+            <arg column="detected_at" javaType="java.time.LocalDateTime"/>
+            <arg column="confirmed_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByChainAndTxHashAndLogIndex" resultMap="walletDepositTransactionRecordMap">
+        SELECT id,
+               user_id,
+               chain,
+               token,
+               token_contract_address,
+               tx_hash,
+               log_index,
+               from_address,
+               to_address,
+               amount,
+               block_number,
+               confirmations,
+               required_confirms,
+               status,
+               detected_at,
+               confirmed_at,
+               updated_at
+        FROM t_wallet_deposit_tx
+        WHERE chain = #{chain}
+          AND tx_hash = #{txHash}
+          AND log_index = #{logIndex}
+    </select>
+
+    <select id="selectByChainAndBlockRange" resultMap="walletDepositTransactionRecordMap">
+        SELECT id,
+               user_id,
+               chain,
+               token,
+               token_contract_address,
+               tx_hash,
+               log_index,
+               from_address,
+               to_address,
+               amount,
+               block_number,
+               confirmations,
+               required_confirms,
+               status,
+               detected_at,
+               confirmed_at,
+               updated_at
+        FROM t_wallet_deposit_tx
+        WHERE chain = #{chain}
+          AND block_number BETWEEN #{fromBlock} AND #{toBlock}
+        ORDER BY block_number ASC, log_index ASC, id ASC
+    </select>
+
+    <insert id="insertWalletDepositTransaction" parameterType="com.falconx.wallet.repository.mapper.record.WalletDepositTransactionRecord">
+        INSERT INTO t_wallet_deposit_tx (
+            id,
+            user_id,
+            chain,
+            token,
+            token_contract_address,
+            tx_hash,
+            log_index,
+            from_address,
+            to_address,
+            amount,
+            block_number,
+            confirmations,
+            required_confirms,
+            status,
+            detected_at,
+            confirmed_at,
+            updated_at
+        ) VALUES (
+            #{id},
+            #{userId},
+            #{chain},
+            #{token},
+            #{tokenContractAddress},
+            #{txHash},
+            #{logIndex},
+            #{fromAddress},
+            #{toAddress},
+            #{amount},
+            #{blockNumber},
+            #{confirmations},
+            #{requiredConfirmations},
+            #{statusCode},
+            #{detectedAt},
+            #{confirmedAt},
+            #{updatedAt}
+        )
+    </insert>
+
+    <update id="updateWalletDepositTransaction" parameterType="com.falconx.wallet.repository.mapper.record.WalletDepositTransactionRecord">
+        UPDATE t_wallet_deposit_tx
+        SET user_id = #{userId},
+            token = #{token},
+            token_contract_address = #{tokenContractAddress},
+            from_address = #{fromAddress},
+            to_address = #{toAddress},
+            amount = #{amount},
+            block_number = #{blockNumber},
+            log_index = #{logIndex},
+            confirmations = #{confirmations},
+            required_confirms = #{requiredConfirmations},
+            status = #{statusCode},
+            detected_at = #{detectedAt},
+            confirmed_at = #{confirmedAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <sql id="depositAdminWhere">
+        <where>
+            <if test="onlyOrphan">AND user_id IS NULL</if>
+            <if test="!onlyOrphan and userId != null">AND user_id = #{userId}</if>
+            <if test="chain != null and chain != ''">AND chain = #{chain}</if>
+            <if test="token != null and token != ''">AND token = #{token}</if>
+            <if test="statusCodes != null and statusCodes.size() > 0">
+                AND status IN
+                <foreach collection="statusCodes" item="sc" open="(" separator="," close=")">
+                    #{sc}
+                </foreach>
+            </if>
+            <if test="fromDetectedAt != null">AND detected_at &gt;= #{fromDetectedAt}</if>
+            <if test="toDetectedAt != null">AND detected_at &lt; #{toDetectedAt}</if>
+        </where>
+    </sql>
+
+    <select id="selectAdminPaginated" resultMap="walletDepositTransactionRecordMap">
+        SELECT id, user_id, chain, token, token_contract_address, tx_hash, log_index,
+               from_address, to_address, amount, block_number, confirmations, required_confirms,
+               status, detected_at, confirmed_at, updated_at
+        FROM t_wallet_deposit_tx
+        <include refid="depositAdminWhere"/>
+        ORDER BY detected_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminFiltered" resultType="long">
+        SELECT COUNT(1) FROM t_wallet_deposit_tx
+        <include refid="depositAdminWhere"/>
+    </select>
+
+    <select id="selectById" resultMap="walletDepositTransactionRecordMap">
+        SELECT id, user_id, chain, token, token_contract_address, tx_hash, log_index,
+               from_address, to_address, amount, block_number, confirmations, required_confirms,
+               status, detected_at, confirmed_at, updated_at
+        FROM t_wallet_deposit_tx
+        WHERE id = #{id}
+    </select>
+
+    <!-- STAGE-6-KYC trigger 2：用户历史 CONFIRMED 入金去重 from_address。status=2 = CONFIRMED.ordinal()。 -->
+    <select id="selectDistinctFromAddressesByUserAndChain" resultType="java.lang.String">
+        SELECT DISTINCT from_address
+        FROM t_wallet_deposit_tx
+        WHERE user_id = #{userId}
+          AND chain = #{chain}
+          AND status = 2
+          AND from_address IS NOT NULL
+    </select>
+</mapper>

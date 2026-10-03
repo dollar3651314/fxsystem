@@ -1,0 +1,3 @@
+-- Stage 7 起交易时间管理采用方案 B：
+-- `t_symbol.market_code + t_trading_hours + t_trading_hours_exception + t_trading_holiday`
+-- 相关结构已前移到 V1 / V2，V3 保留为历史占位迁移。

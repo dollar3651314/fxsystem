@@ -1,0 +1,19 @@
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6380
+
+falconx:
+  gateway:
+    security:
+      public-key-pem: |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6RF80EfuLnzHqHjUHBTf
+        uKi3IRthKplS5kq7CVr3kCUdsJUDWWwFufwZ2iBA3ODlOxhcXQu2P7RKVH80KVS4
+        CcG+KJMnK3JBh7iesstRgZ/nUXPigg2NUEVhHR47RR7NjJbU5TiV6AHWvM7nEWLh
+        FkDE6dK3xc+BUvzTRowP6pXBz/S0tYlBV2nonYeMKiVBjSmrxhUfkQOnvhq+ZY5h
+        X4rDL2Pke6n4odcdi+uEKfH43cBdE9Jb+kvMdrArXedsZ9gyxeKyXoF8ptX26YC1
+        hZIkHfTrZl4oZz/hUGnYXC7dCA0Nq10KNbpyRFjg5gXrdvHbm12l/Y3EA3z+88q6
+        1wIDAQAB
+        -----END PUBLIC KEY-----

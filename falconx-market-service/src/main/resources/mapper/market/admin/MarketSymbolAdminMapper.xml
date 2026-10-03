@@ -1,0 +1,628 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.repository.mapper.MarketSymbolAdminMapper">
+
+    <resultMap id="symbolAdminRecordMap" type="com.falconx.market.repository.mapper.record.MarketSymbolAdminRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="lp_code" javaType="java.lang.String"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="category" javaType="java.lang.Integer"/>
+            <arg column="market_code" javaType="java.lang.String"/>
+            <arg column="base_currency" javaType="java.lang.String"/>
+            <arg column="quote_currency" javaType="java.lang.String"/>
+            <arg column="price_precision" javaType="java.lang.Integer"/>
+            <arg column="qty_precision" javaType="java.lang.Integer"/>
+            <arg column="status" javaType="java.lang.Integer"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="symbolColumns">
+        id, lp_code, symbol, category, market_code, base_currency, quote_currency,
+        price_precision, qty_precision, status, created_at
+    </sql>
+
+    <sql id="symbolWhereFilters">
+        <where>
+            <if test="category != null">
+                AND category = #{category}
+            </if>
+            <if test="marketCode != null and marketCode != ''">
+                AND market_code = #{marketCode}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="lpCode != null and lpCode != ''">
+                AND lp_code = #{lpCode}
+            </if>
+            <if test="symbolLike != null and symbolLike != ''">
+                AND symbol LIKE CONCAT('%', #{symbolLike}, '%')
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectSymbolsForList" resultMap="symbolAdminRecordMap">
+        SELECT <include refid="symbolColumns"/>
+        FROM t_symbol
+        <include refid="symbolWhereFilters"/>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countSymbols" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM t_symbol
+        <include refid="symbolWhereFilters"/>
+    </select>
+
+    <select id="selectSymbolById" resultMap="symbolAdminRecordMap">
+        SELECT <include refid="symbolColumns"/>
+        FROM t_symbol WHERE id = #{id}
+    </select>
+
+    <select id="selectSymbolBySymbol" resultMap="symbolAdminRecordMap">
+        SELECT <include refid="symbolColumns"/>
+        FROM t_symbol WHERE lp_code = 'GODSA' AND symbol = #{symbol}
+    </select>
+
+    <select id="selectSymbolByLpCodeAndSymbol" resultMap="symbolAdminRecordMap">
+        SELECT <include refid="symbolColumns"/>
+        FROM t_symbol WHERE lp_code = #{lpCode} AND symbol = #{symbol}
+    </select>
+
+    <update id="updateSymbolConfig">
+        UPDATE t_symbol
+        SET category = COALESCE(#{category}, category),
+            market_code = COALESCE(#{marketCode}, market_code),
+            price_precision = COALESCE(#{pricePrecision}, price_precision),
+            qty_precision = COALESCE(#{qtyPrecision}, qty_precision)
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateSymbolStatus">
+        UPDATE t_symbol SET status = #{status} WHERE id = #{id}
+    </update>
+
+    <!-- t_swap_rate -->
+    <resultMap id="swapRateRecordMap" type="com.falconx.market.repository.mapper.record.MarketSwapRateRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="long_rate" javaType="java.math.BigDecimal"/>
+            <arg column="short_rate" javaType="java.math.BigDecimal"/>
+            <arg column="rollover_time" javaType="java.time.LocalTime"/>
+            <arg column="effective_from" javaType="java.time.LocalDate"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectCurrentSwapRate" resultMap="swapRateRecordMap">
+        SELECT id, symbol, long_rate, short_rate, rollover_time, effective_from, created_at, updated_at
+        FROM t_swap_rate
+        WHERE symbol = #{symbol} AND effective_from &lt;= #{today}
+        ORDER BY effective_from DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectRecentSwapRates" resultMap="swapRateRecordMap">
+        SELECT id, symbol, long_rate, short_rate, rollover_time, effective_from, created_at, updated_at
+        FROM t_swap_rate
+        WHERE symbol = #{symbol}
+        ORDER BY effective_from DESC, id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countSwapRateBySymbolAndDate" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM t_swap_rate
+        WHERE symbol = #{symbol} AND effective_from = #{effectiveFrom}
+    </select>
+
+    <insert id="insertSwapRate">
+        INSERT INTO t_swap_rate (id, symbol, long_rate, short_rate, rollover_time, effective_from)
+        VALUES (#{id}, #{symbol}, #{longRate}, #{shortRate}, #{rolloverTime}, #{effectiveFrom})
+    </insert>
+
+    <!-- t_trading_hours / 例外 / 节假日 -->
+    <resultMap id="tradingSessionRecordMap" type="com.falconx.market.repository.mapper.record.MarketTradingSessionRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="day_of_week" javaType="_int"/>
+            <arg column="session_no" javaType="_int"/>
+            <arg column="open_time" javaType="java.time.LocalTime"/>
+            <arg column="close_time" javaType="java.time.LocalTime"/>
+            <arg column="timezone" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="_boolean"/>
+            <arg column="effective_from" javaType="java.time.LocalDate"/>
+            <arg column="effective_to" javaType="java.time.LocalDate"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectTradingSessions" resultMap="tradingSessionRecordMap">
+        SELECT id, symbol, day_of_week, session_no, open_time, close_time, timezone,
+               enabled, effective_from, effective_to
+        FROM t_trading_hours
+        WHERE symbol = #{symbol}
+        ORDER BY day_of_week ASC, session_no ASC, effective_from ASC
+    </select>
+
+    <select id="selectTradingSessionByIdForSymbol" resultMap="tradingSessionRecordMap">
+        SELECT id, symbol, day_of_week, session_no, open_time, close_time, timezone,
+               enabled, effective_from, effective_to
+        FROM t_trading_hours
+        WHERE symbol = #{symbol} AND id = #{id}
+    </select>
+
+    <select id="countTradingSessionConflict" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_trading_hours
+        WHERE symbol = #{symbol}
+          AND day_of_week = #{dayOfWeek}
+          AND session_no = #{sessionNo}
+          AND effective_from = #{effectiveFrom}
+        <if test="excludeId != null">
+          AND id &lt;&gt; #{excludeId}
+        </if>
+    </select>
+
+    <insert id="insertTradingSession">
+        INSERT INTO t_trading_hours (
+            id, symbol, day_of_week, session_no, open_time, close_time,
+            timezone, enabled, effective_from, effective_to
+        ) VALUES (
+            #{id}, #{symbol}, #{dayOfWeek}, #{sessionNo}, #{openTime}, #{closeTime},
+            #{timezone}, #{enabled}, #{effectiveFrom}, #{effectiveTo}
+        )
+    </insert>
+
+    <update id="updateTradingSession">
+        UPDATE t_trading_hours
+        SET day_of_week = #{dayOfWeek},
+            session_no = #{sessionNo},
+            open_time = #{openTime},
+            close_time = #{closeTime},
+            timezone = #{timezone},
+            enabled = #{enabled},
+            effective_from = #{effectiveFrom},
+            effective_to = #{effectiveTo}
+        WHERE symbol = #{symbol} AND id = #{id}
+    </update>
+
+    <delete id="deleteTradingSession">
+        DELETE FROM t_trading_hours
+        WHERE symbol = #{symbol} AND id = #{id}
+    </delete>
+
+    <resultMap id="tradingExceptionRecordMap" type="com.falconx.market.repository.mapper.record.MarketTradingSessionExceptionRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="trade_date" javaType="java.time.LocalDate"/>
+            <arg column="exception_type" javaType="_int"/>
+            <arg column="session_no" javaType="java.lang.Integer"/>
+            <arg column="open_time" javaType="java.time.LocalTime"/>
+            <arg column="close_time" javaType="java.time.LocalTime"/>
+            <arg column="timezone" javaType="java.lang.String"/>
+            <arg column="reason" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectTradingExceptions" resultMap="tradingExceptionRecordMap">
+        SELECT id, symbol, trade_date, exception_type, session_no, open_time, close_time, timezone,
+               reason
+        FROM t_trading_hours_exception
+        WHERE symbol = #{symbol} AND trade_date &gt;= CURRENT_DATE
+        ORDER BY trade_date ASC
+    </select>
+
+    <select id="selectTradingExceptionByIdForSymbol" resultMap="tradingExceptionRecordMap">
+        SELECT id, symbol, trade_date, exception_type, session_no, open_time, close_time, timezone,
+               reason
+        FROM t_trading_hours_exception
+        WHERE symbol = #{symbol} AND id = #{id}
+    </select>
+
+    <select id="countTradingExceptionConflict" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_trading_hours_exception
+        WHERE symbol = #{symbol}
+          AND trade_date = #{tradeDate}
+          <choose>
+              <when test="sessionNo == null">
+                  AND session_no IS NULL
+              </when>
+              <otherwise>
+                  AND session_no = #{sessionNo}
+              </otherwise>
+          </choose>
+        <if test="excludeId != null">
+          AND id &lt;&gt; #{excludeId}
+        </if>
+    </select>
+
+    <insert id="insertTradingException">
+        INSERT INTO t_trading_hours_exception (
+            id, symbol, trade_date, exception_type, session_no, open_time,
+            close_time, timezone, reason
+        ) VALUES (
+            #{id}, #{symbol}, #{tradeDate}, #{exceptionType}, #{sessionNo}, #{openTime},
+            #{closeTime}, #{timezone}, #{reason}
+        )
+    </insert>
+
+    <update id="updateTradingException">
+        UPDATE t_trading_hours_exception
+        SET trade_date = #{tradeDate},
+            exception_type = #{exceptionType},
+            session_no = #{sessionNo},
+            open_time = #{openTime},
+            close_time = #{closeTime},
+            timezone = #{timezone},
+            reason = #{reason}
+        WHERE symbol = #{symbol} AND id = #{id}
+    </update>
+
+    <delete id="deleteTradingException">
+        DELETE FROM t_trading_hours_exception
+        WHERE symbol = #{symbol} AND id = #{id}
+    </delete>
+
+    <resultMap id="marketHolidayRecordMap" type="com.falconx.market.repository.mapper.record.MarketTradingHolidayRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="market_code" javaType="java.lang.String"/>
+            <arg column="holiday_date" javaType="java.time.LocalDate"/>
+            <arg column="holiday_type" javaType="_int"/>
+            <arg column="open_time" javaType="java.time.LocalTime"/>
+            <arg column="close_time" javaType="java.time.LocalTime"/>
+            <arg column="timezone" javaType="java.lang.String"/>
+            <arg column="holiday_name" javaType="java.lang.String"/>
+            <arg column="country_code" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectMarketHolidays" resultMap="marketHolidayRecordMap">
+        SELECT id, market_code, holiday_date, holiday_type, open_time, close_time, timezone, holiday_name,
+               country_code
+        FROM t_trading_holiday
+        WHERE market_code = #{marketCode} AND holiday_date &gt;= CURRENT_DATE
+        ORDER BY holiday_date ASC
+    </select>
+
+    <select id="selectMarketHolidaysForList" resultMap="marketHolidayRecordMap">
+        SELECT id, market_code, holiday_date, holiday_type, open_time, close_time, timezone, holiday_name,
+               country_code
+        FROM t_trading_holiday
+        <where>
+            <if test="marketCode != null and marketCode != ''">
+                AND market_code = #{marketCode}
+            </if>
+        </where>
+        ORDER BY holiday_date DESC, market_code ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMarketHolidays" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_trading_holiday
+        <where>
+            <if test="marketCode != null and marketCode != ''">
+                AND market_code = #{marketCode}
+            </if>
+        </where>
+    </select>
+
+    <select id="selectMarketHolidayById" resultMap="marketHolidayRecordMap">
+        SELECT id, market_code, holiday_date, holiday_type, open_time, close_time, timezone, holiday_name,
+               country_code
+        FROM t_trading_holiday
+        WHERE id = #{id}
+    </select>
+
+    <select id="countMarketHolidayConflict" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_trading_holiday
+        WHERE market_code = #{marketCode}
+          AND holiday_date = #{holidayDate}
+        <if test="excludeId != null">
+          AND id &lt;&gt; #{excludeId}
+        </if>
+    </select>
+
+    <insert id="insertMarketHoliday">
+        INSERT INTO t_trading_holiday (
+            id, market_code, holiday_date, holiday_type, open_time, close_time,
+            timezone, holiday_name, country_code
+        ) VALUES (
+            #{id}, #{marketCode}, #{holidayDate}, #{holidayType}, #{openTime}, #{closeTime},
+            #{timezone}, #{holidayName}, #{countryCode}
+        )
+    </insert>
+
+    <update id="updateMarketHoliday">
+        UPDATE t_trading_holiday
+        SET market_code = #{marketCode},
+            holiday_date = #{holidayDate},
+            holiday_type = #{holidayType},
+            open_time = #{openTime},
+            close_time = #{closeTime},
+            timezone = #{timezone},
+            holiday_name = #{holidayName},
+            country_code = #{countryCode}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteMarketHoliday">
+        DELETE FROM t_trading_holiday
+        WHERE id = #{id}
+    </delete>
+
+    <!-- t_symbol_quote_mapping 管理端（STAGE-2-SYMBOL-PARAMS-DOWNSHIFT 字段集扩展） -->
+    <resultMap id="quoteMappingAdminRecordMap" type="com.falconx.market.repository.mapper.record.MarketSymbolQuoteMappingAdminRecord">
+        <constructor>
+            <arg column="platform_symbol" javaType="java.lang.String"/>
+            <arg column="source_provider" javaType="java.lang.String"/>
+            <arg column="source_lp_code" javaType="java.lang.String"/>
+            <arg column="source_symbol" javaType="java.lang.String"/>
+            <arg column="category" javaType="java.lang.Integer"/>
+            <arg column="market_code" javaType="java.lang.String"/>
+            <arg column="price_multiplier" javaType="java.math.BigDecimal"/>
+            <arg column="bid_adjustment" javaType="java.math.BigDecimal"/>
+            <arg column="ask_adjustment" javaType="java.math.BigDecimal"/>
+            <arg column="enabled" javaType="java.lang.Integer"/>
+            <arg column="lp_subscribe_enabled" javaType="java.lang.Integer"/>
+            <arg column="max_leverage" javaType="java.lang.Integer"/>
+            <arg column="taker_fee_rate" javaType="java.math.BigDecimal"/>
+            <arg column="spread" javaType="java.math.BigDecimal"/>
+            <arg column="min_qty" javaType="java.math.BigDecimal"/>
+            <arg column="max_qty" javaType="java.math.BigDecimal"/>
+            <arg column="min_notional" javaType="java.math.BigDecimal"/>
+            <arg column="price_precision" javaType="java.lang.Integer"/>
+            <arg column="qty_precision" javaType="java.lang.Integer"/>
+            <arg column="source_status" javaType="java.lang.Integer"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="quoteMappingColumns">
+        m.platform_symbol,
+        m.source_provider,
+        m.source_lp_code,
+        m.source_symbol,
+        m.category,
+        m.market_code,
+        m.price_multiplier,
+        m.bid_adjustment,
+        m.ask_adjustment,
+        m.enabled,
+        m.lp_subscribe_enabled,
+        m.max_leverage,
+        m.taker_fee_rate,
+        m.spread,
+        m.min_qty,
+        m.max_qty,
+        m.min_notional,
+        m.price_precision,
+        m.qty_precision,
+        s.status AS source_status,
+        m.created_at,
+        m.updated_at
+    </sql>
+
+    <sql id="quoteMappingFilters">
+        <where>
+            <if test="platformSymbolLike != null and platformSymbolLike != ''">
+                AND m.platform_symbol LIKE CONCAT('%', #{platformSymbolLike}, '%')
+            </if>
+            <if test="sourceLpCode != null and sourceLpCode != ''">
+                AND m.source_lp_code = #{sourceLpCode}
+            </if>
+            <if test="sourceSymbolLike != null and sourceSymbolLike != ''">
+                AND m.source_symbol LIKE CONCAT('%', #{sourceSymbolLike}, '%')
+            </if>
+            <if test="enabled != null">
+                AND m.enabled = #{enabled}
+            </if>
+            <if test="lpSubscribeEnabled != null">
+                AND m.lp_subscribe_enabled = #{lpSubscribeEnabled}
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectQuoteMappingsForList" resultMap="quoteMappingAdminRecordMap">
+        SELECT <include refid="quoteMappingColumns"/>
+        FROM t_symbol_quote_mapping m
+        LEFT JOIN t_symbol s ON s.lp_code = m.source_lp_code AND s.symbol = m.source_symbol
+        <include refid="quoteMappingFilters"/>
+        ORDER BY m.updated_at DESC, m.platform_symbol ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countQuoteMappings" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_symbol_quote_mapping m
+        <include refid="quoteMappingFilters"/>
+    </select>
+
+    <select id="selectQuoteMappingByPlatformSymbol" resultMap="quoteMappingAdminRecordMap">
+        SELECT <include refid="quoteMappingColumns"/>
+        FROM t_symbol_quote_mapping m
+        LEFT JOIN t_symbol s ON s.lp_code = m.source_lp_code AND s.symbol = m.source_symbol
+        WHERE m.platform_symbol = #{platformSymbol}
+    </select>
+
+    <insert id="insertQuoteMapping">
+        INSERT INTO t_symbol_quote_mapping (
+            platform_symbol,
+            source_provider,
+            source_lp_code,
+            source_symbol,
+            category,
+            market_code,
+            price_multiplier,
+            bid_adjustment,
+            ask_adjustment,
+            enabled,
+            lp_subscribe_enabled,
+            max_leverage,
+            taker_fee_rate,
+            spread,
+            min_qty,
+            max_qty,
+            min_notional,
+            price_precision,
+            qty_precision
+        ) VALUES (
+            #{platformSymbol},
+            #{sourceProvider},
+            #{sourceLpCode},
+            #{sourceSymbol},
+            #{category},
+            #{marketCode},
+            #{priceMultiplier},
+            #{bidAdjustment},
+            #{askAdjustment},
+            #{enabled},
+            #{lpSubscribeEnabled},
+            #{maxLeverage},
+            #{takerFeeRate},
+            #{spread},
+            #{minQty},
+            #{maxQty},
+            #{minNotional},
+            #{pricePrecision},
+            #{qtyPrecision}
+        )
+    </insert>
+
+    <update id="updateQuoteMapping">
+        UPDATE t_symbol_quote_mapping
+        SET source_provider = COALESCE(#{sourceProvider}, source_provider),
+            source_lp_code = COALESCE(#{sourceLpCode}, source_lp_code),
+            source_symbol = COALESCE(#{sourceSymbol}, source_symbol),
+            category = COALESCE(#{category}, category),
+            market_code = COALESCE(#{marketCode}, market_code),
+            price_multiplier = COALESCE(#{priceMultiplier}, price_multiplier),
+            bid_adjustment = COALESCE(#{bidAdjustment}, bid_adjustment),
+            ask_adjustment = COALESCE(#{askAdjustment}, ask_adjustment),
+            enabled = COALESCE(#{enabled}, enabled),
+            lp_subscribe_enabled = COALESCE(#{lpSubscribeEnabled}, lp_subscribe_enabled),
+            max_leverage = COALESCE(#{maxLeverage}, max_leverage),
+            taker_fee_rate = COALESCE(#{takerFeeRate}, taker_fee_rate),
+            spread = COALESCE(#{spread}, spread),
+            min_qty = COALESCE(#{minQty}, min_qty),
+            max_qty = COALESCE(#{maxQty}, max_qty),
+            min_notional = COALESCE(#{minNotional}, min_notional),
+            price_precision = #{pricePrecision},
+            qty_precision = #{qtyPrecision}
+        WHERE platform_symbol = #{platformSymbol}
+    </update>
+
+    <!-- t_symbol_group_visibility 管理端 -->
+    <resultMap id="groupVisibilityAdminRecordMap" type="com.falconx.market.repository.mapper.record.MarketSymbolGroupVisibilityAdminRecord">
+        <constructor>
+            <arg column="group_code" javaType="java.lang.String"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="visible" javaType="java.lang.Integer"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="groupVisibilityFilters">
+        <where>
+            <if test="groupCode != null and groupCode != ''">
+                AND group_code = #{groupCode}
+            </if>
+            <if test="symbolLike != null and symbolLike != ''">
+                AND symbol LIKE CONCAT('%', #{symbolLike}, '%')
+            </if>
+            <if test="visible != null">
+                AND visible = #{visible}
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectGroupVisibilityForList" resultMap="groupVisibilityAdminRecordMap">
+        SELECT group_code, symbol, visible, created_at, updated_at
+        FROM t_symbol_group_visibility
+        <include refid="groupVisibilityFilters"/>
+        ORDER BY updated_at DESC, group_code ASC, symbol ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countGroupVisibility" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_symbol_group_visibility
+        <include refid="groupVisibilityFilters"/>
+    </select>
+
+    <select id="selectGroupVisibility" resultMap="groupVisibilityAdminRecordMap">
+        SELECT group_code, symbol, visible, created_at, updated_at
+        FROM t_symbol_group_visibility
+        WHERE group_code = #{groupCode} AND symbol = #{symbol}
+    </select>
+
+    <insert id="upsertGroupVisibility">
+        INSERT INTO t_symbol_group_visibility (group_code, symbol, visible)
+        VALUES (#{groupCode}, #{symbol}, #{visible})
+        ON DUPLICATE KEY UPDATE
+            visible = VALUES(visible),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <!-- STAGE-2-SYMBOL-PARAMS-DOWNSHIFT R4.1.B: source CRUD -->
+    <insert id="insertSymbol">
+        INSERT INTO t_symbol (
+            id, lp_code, symbol, category, market_code, base_currency, quote_currency,
+            price_precision, qty_precision, status
+        ) VALUES (
+            #{id}, #{lpCode}, #{symbol}, #{category}, #{marketCode}, #{baseCurrency}, #{quoteCurrency},
+            #{pricePrecision}, #{qtyPrecision}, 1
+        )
+    </insert>
+
+    <!-- STAGE-2-SYMBOL-PARAMS-DOWNSHIFT R4.1.B: 用户组可见性聚合视图。
+         默认 group_concat_max_len 是 1024 字节（约 100 个 symbol），单组可能超限。
+         SQL_NO_CACHE + SET SESSION 提升单次查询上限，约 30000+ symbol。 -->
+    <resultMap id="groupVisibilityGroupedRecordMap" type="com.falconx.market.repository.mapper.record.GroupVisibilityGroupedRecord">
+        <constructor>
+            <arg column="group_code" javaType="java.lang.String"/>
+            <arg column="visible_count" javaType="java.lang.Integer"/>
+            <arg column="visible_symbols" javaType="java.lang.String"/>
+            <arg column="last_modified_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <update id="enlargeGroupConcatMaxLen">
+        SET SESSION group_concat_max_len = 1048576
+    </update>
+
+    <select id="selectGroupVisibilityGrouped" resultMap="groupVisibilityGroupedRecordMap">
+        <bind name="useFilter" value="groupCodeLike != null and groupCodeLike != ''"/>
+        SELECT
+            group_code,
+            COUNT(*) AS visible_count,
+            GROUP_CONCAT(symbol ORDER BY symbol SEPARATOR ',') AS visible_symbols,
+            MAX(updated_at) AS last_modified_at
+        FROM t_symbol_group_visibility
+        WHERE visible = 1
+        <if test="useFilter">AND group_code LIKE CONCAT('%', #{groupCodeLike}, '%')</if>
+        GROUP BY group_code
+        ORDER BY group_code ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countGroupVisibilityGrouped" resultType="java.lang.Long">
+        <bind name="useFilter" value="groupCodeLike != null and groupCodeLike != ''"/>
+        SELECT COUNT(DISTINCT group_code)
+        FROM t_symbol_group_visibility
+        WHERE visible = 1
+        <if test="useFilter">AND group_code LIKE CONCAT('%', #{groupCodeLike}, '%')</if>
+    </select>
+
+</mapper>

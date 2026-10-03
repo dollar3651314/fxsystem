@@ -1,0 +1,136 @@
+:root {
+  /* 2026-05-20: auth gate 切换到 console-editorial 暗色，复用 terminal 调色板 */
+  --fx-auth-bg: #050608;
+  --fx-auth-bg-warm: #0a0d12;
+  --fx-auth-glass-cyan: rgba(84, 230, 255, 0.13);
+  --fx-auth-glass-mint: rgba(168, 255, 92, 0.05);
+  --fx-auth-text: #f4f7fb;
+  --fx-auth-muted: #9aa4b2;
+  --fx-auth-button-text: #051418;
+  --fx-auth-secondary: rgba(255, 255, 255, 0.04);
+  --fx-terminal-bg: #050608;
+  --fx-surface-1: #0b0e12;
+  --fx-surface-2: #11161c;
+  --fx-surface-3: #171d24;
+  --fx-border: rgba(255, 255, 255, 0.1);
+  --fx-border-strong: rgba(84, 230, 255, 0.22);
+  --fx-text: #f4f7fb;
+  --fx-muted: #9aa4b2;
+  --fx-subtle: #687383;
+  --fx-cyan: #54e6ff;
+  --fx-lime: #a8ff5c;
+  --fx-long: #a8ff5c;
+  --fx-short: #ff6378;
+  --fx-risk: #ffb84d;
+  --fx-danger: #ff3d57;
+  --fx-space-1: 4px;
+  --fx-space-2: 8px;
+  --fx-space-3: 12px;
+  --fx-space-4: 16px;
+  --fx-space-5: 20px;
+  --fx-space-6: 24px;
+  --fx-space-8: 32px;
+  --fx-radius-sm: 6px;
+  --fx-radius-md: 8px;
+  --fx-radius-lg: 12px;
+  --fx-radius-xl: 18px;
+  --fx-mono-stack: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono",
+    Menlo, Consolas, "Liberation Mono", monospace;
+  --fx-eyebrow-letter: 0.18em;
+  --fx-hairline: rgba(255, 255, 255, 0.08);
+  --fx-hairline-strong: rgba(255, 255, 255, 0.14);
+
+  /* H5 自适应 — 标准 4 档断点（仅作 documentation 用，CSS @media 无法引用变量）
+   * sm = 640px, md = 768px, lg = 1024px, xl = 1280px
+   * 所有新写 @media query 必须用这 4 个值之一，禁止其他数字
+   */
+  --fx-breakpoint-sm: 640px;
+  --fx-breakpoint-md: 768px;
+  --fx-breakpoint-lg: 1024px;
+  --fx-breakpoint-xl: 1280px;
+
+  /* iOS / Android safe area（刘海屏 + 底部 home indicator）— 需要 index.html viewport-fit=cover */
+  --fx-safe-top: env(safe-area-inset-top, 0px);
+  --fx-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --fx-safe-left: env(safe-area-inset-left, 0px);
+  --fx-safe-right: env(safe-area-inset-right, 0px);
+
+  /* H5 mobile shell sizing */
+  --fx-bottom-nav-height: 56px;
+  --fx-drawer-width: 280px;
+  --fx-sheet-handle-height: 32px;
+
+  /* Chart 系列颜色 token —— 让 MarketChart.tsx 通过 getComputedStyle 在 dark/light 切换时
+   * 重新拉取。同时 series.priceLineColor / crosshairMarker / background gradients 也走这套，
+   * 保证图表色票永远跟全局主题一致。 */
+  --fx-chart-bid: #54e6ff;
+  --fx-chart-ask: #ff8ca1;
+  --fx-chart-mid: #facc15;
+  --fx-chart-candle-up: #a8ff5c;
+  --fx-chart-candle-down: #ff6378;
+  --fx-chart-text: #8d99a8;
+  --fx-chart-grid: rgba(255, 255, 255, 0.05);
+  --fx-chart-grid-strong: rgba(255, 255, 255, 0.025);
+  --fx-chart-axis-border: rgba(255, 255, 255, 0.06);
+  --fx-chart-crosshair: rgba(84, 230, 255, 0.45);
+}
+
+/* ===== Light theme override =====
+ * 2026-05-28：纸质金融报「PRO LIGHT」配色，与 dark 同一套设计语言（mono / eyebrow / hairline /
+ * §NN section header）。只动调色板：底色奶白偏冷、文本深炭、accents 加深保证 light bg 上的对比与
+ * WCAG 可读性。chart 也跟随。
+ *
+ * 触发方式：<html data-theme="light">。useThemeStore 持久化 + ThemeToggle 切换。
+ */
+:root[data-theme="light"] {
+  /* === Trading Floor Daylight 配色 (2026-05-28 二轮重设计) === */
+  /* 底色叠 subtle 冷调渐变，给屏幕一种"晨光透进玻璃幕墙交易厅"的氛围。 */
+  --fx-terminal-bg: #f4f7fb;
+  --fx-terminal-bg-warm: #eef3f8;
+  --fx-surface-1: #ffffff;
+  --fx-surface-2: #f8fafc;
+  --fx-surface-3: #eef5f9;          /* 表格头 / hover surface 用淡 cyan 底，不是死灰 */
+  --fx-surface-accent: rgba(8, 145, 178, 0.06);  /* eyebrow 背景 */
+  --fx-border: rgba(15, 23, 42, 0.10);
+  --fx-border-strong: rgba(8, 145, 178, 0.32);
+  --fx-text: #0f172a;
+  --fx-muted: #475569;
+  --fx-subtle: #64748b;
+
+  /* 主品牌 cyan 从 0e7a9b 调到更明亮的 cyan-600 #0891b2 —— 既保持 WCAG AA 又比上一版更"鲜活"。 */
+  --fx-cyan: #0891b2;
+  --fx-cyan-deep: #0e7490;          /* hover / pressed 用 */
+  --fx-cyan-bright: #06b6d4;        /* highlight / glow 用 */
+  --fx-lime: #15803d;
+  --fx-long: #16a34a;               /* vibrant green for +PnL */
+  --fx-short: #dc2626;              /* bold red for -PnL */
+  --fx-risk: #ea580c;
+  --fx-danger: #b91c1c;
+  --fx-amber: #d97706;              /* mid / 重要数值 */
+  --fx-violet: #7c3aed;             /* 跨界 accent，eyebrow 渐变第二色 */
+
+  --fx-hairline: rgba(15, 23, 42, 0.06);
+  --fx-hairline-strong: rgba(15, 23, 42, 0.10);
+
+  /* "字体炫酷" 套件 —— 用 background-clip: text 给 §NN eyebrow / 大数字 / 标题做渐变字。 */
+  --fx-text-gradient: linear-gradient(135deg, #0891b2 0%, #7c3aed 100%);
+  --fx-text-gradient-warm: linear-gradient(135deg, #d97706 0%, #dc2626 100%);
+  --fx-text-gradient-cool: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+
+  /* 卡面阴影 light 必备：dark 是 backdrop-blur + glow，light 用 subtle 双层阴影做"纸卡"质感 */
+  --fx-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
+  --fx-shadow-card-hover: 0 2px 4px rgba(15, 23, 42, 0.05), 0 12px 32px rgba(8, 145, 178, 0.08);
+  --fx-shadow-modal: 0 24px 48px -12px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.05);
+
+  /* Chart 同步切换 light：BID/ASK 加深 + grid/crosshair 浅底版本 */
+  --fx-chart-bid: #0891b2;
+  --fx-chart-ask: #dc2626;
+  --fx-chart-mid: #d97706;
+  --fx-chart-candle-up: #16a34a;
+  --fx-chart-candle-down: #dc2626;
+  --fx-chart-text: #475569;
+  --fx-chart-grid: rgba(15, 23, 42, 0.05);
+  --fx-chart-grid-strong: rgba(15, 23, 42, 0.025);
+  --fx-chart-axis-border: rgba(15, 23, 42, 0.08);
+  --fx-chart-crosshair: rgba(8, 145, 178, 0.42);
+}

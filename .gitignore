@@ -1,0 +1,66 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+*.swp
+*.swo
+
+# Java / Maven build outputs
+**/target/
+**/build/
+out/
+*.class
+*.ctxt
+.mtj.tmp/
+
+# Logs and runtime files
+logs/
+*.log
+*.pid
+*.pid.lock
+hs_err_pid*
+replay_pid*
+/.tmp/
+
+# Test reports
+**/surefire-reports/
+**/failsafe-reports/
+
+# Package files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Local environment files
+.env
+.env.*
+!.env.example
+.vscode/settings.json
+.DS_Store
+docs/.DS_Store
+.DS_Store
+.gstack/
+
+# Claude Code session worktrees (per-session disposable workspaces)
+.claude/worktrees/
+
+# Dev-only Java truststore for WSL corporate proxy MITM (LifeByte root CA)
+# 团队成员各自生成；共享会让生产环境用错信任库
+tools/wallet-truststore.p12
+
+# Root-level transient node_modules（子项目内已 ignore，root 漏了——避免误装时污染）
+/node_modules/
+.playwright-mcp/
+
+
+# 本地 compose override（机器本地 workaround，模板见 docs/setup/docker-compose.override.wsl-clickhouse.example.yml）
+docker-compose.override.yml

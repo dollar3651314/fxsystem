@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.repository.mapper.MarketTradingSessionExceptionMapper">
+
+    <resultMap id="MarketTradingSessionExceptionRecordMap" type="com.falconx.market.repository.mapper.record.MarketTradingSessionExceptionRecord">
+        <constructor>
+            <arg column="id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="trade_date" javaType="java.time.LocalDate"/>
+            <arg column="exception_type" javaType="_int"/>
+            <arg column="session_no" javaType="java.lang.Integer"/>
+            <arg column="open_time" javaType="java.time.LocalTime"/>
+            <arg column="close_time" javaType="java.time.LocalTime"/>
+            <arg column="timezone" javaType="java.lang.String"/>
+            <arg column="reason" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectAll" resultMap="MarketTradingSessionExceptionRecordMap">
+        SELECT
+            id,
+            symbol,
+            trade_date,
+            exception_type,
+            session_no,
+            open_time,
+            close_time,
+            timezone,
+            reason
+        FROM t_trading_hours_exception
+        ORDER BY symbol ASC, trade_date ASC, session_no ASC
+    </select>
+</mapper>

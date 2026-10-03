@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.repository.mapper.MarketSymbolMapper">
+
+    <!-- LP 源 symbol 元数据 ResultMap（V11 后字段裁剪：删除 min_qty/max_qty/min_notional/max_leverage/taker_fee_rate/spread） -->
+    <resultMap id="MarketSymbolRecordMap" type="com.falconx.market.repository.mapper.record.MarketSymbolRecord">
+        <constructor>
+            <arg column="id" javaType="java.lang.Long"/>
+            <arg column="lp_code" javaType="java.lang.String"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="category" javaType="_int"/>
+            <arg column="market_code" javaType="java.lang.String"/>
+            <arg column="base_currency" javaType="java.lang.String"/>
+            <arg column="quote_currency" javaType="java.lang.String"/>
+            <arg column="price_precision" javaType="_int"/>
+            <arg column="qty_precision" javaType="_int"/>
+            <arg column="status" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 含 mapping 系统级产品配置的 platform symbol ResultMap（STAGE-2-SYMBOL-PARAMS-DOWNSHIFT 新增）。
+         symbol 列由 SQL 写成 m.platform_symbol AS symbol；6 交易字段取自 m.*；
+         V15 起 category / market_code / precision 也全部取自 m.*。 -->
+    <resultMap id="MarketSymbolWithSpecRecordMap" type="com.falconx.market.repository.mapper.record.MarketSymbolWithSpecRecord">
+        <constructor>
+            <arg column="id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="category" javaType="_int"/>
+            <arg column="market_code" javaType="java.lang.String"/>
+            <arg column="base_currency" javaType="java.lang.String"/>
+            <arg column="quote_currency" javaType="java.lang.String"/>
+            <arg column="price_precision" javaType="_int"/>
+            <arg column="qty_precision" javaType="_int"/>
+            <arg column="min_qty" javaType="java.math.BigDecimal"/>
+            <arg column="max_qty" javaType="java.math.BigDecimal"/>
+            <arg column="min_notional" javaType="java.math.BigDecimal"/>
+            <arg column="max_leverage" javaType="_int"/>
+            <arg column="taker_fee_rate" javaType="java.math.BigDecimal"/>
+            <arg column="spread" javaType="java.math.BigDecimal"/>
+            <arg column="status" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="MarketSymbolColumns">
+        id,
+        lp_code,
+        symbol,
+        category,
+        market_code,
+        base_currency,
+        quote_currency,
+        price_precision,
+        qty_precision,
+        status
+    </sql>
+
+    <sql id="MarketSymbolColumnsAliased">
+        s.id,
+        s.lp_code,
+        s.symbol,
+        s.category,
+        s.market_code,
+        s.base_currency,
+        s.quote_currency,
+        s.price_precision,
+        s.qty_precision,
+        s.status
+    </sql>
+
+    <!-- 含 mapping JOIN 的 platform symbol 字段集：
+         symbol 列覆盖为 mapping.platform_symbol；
+         category / market_code / precision / 6 交易字段全部取自 mapping。 -->
+    <sql id="MarketPlatformSymbolWithSpecColumnsAliased">
+        s.id,
+        m.platform_symbol AS symbol,
+        m.category,
+        m.market_code,
+        s.base_currency,
+        s.quote_currency,
+        m.price_precision,
+        m.qty_precision,
+        m.min_qty,
+        m.max_qty,
+        m.min_notional,
+        m.max_leverage,
+        m.taker_fee_rate,
+        m.spread,
+        s.status
+    </sql>
+
+    <select id="selectAllTradingSymbols" resultMap="MarketSymbolRecordMap">
+        SELECT
+        <include refid="MarketSymbolColumns"/>
+        FROM t_symbol
+        WHERE status = 1
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectTradingSymbolsByGroupCode" resultMap="MarketSymbolWithSpecRecordMap">
+        SELECT
+        <include refid="MarketPlatformSymbolWithSpecColumnsAliased"/>
+        FROM t_symbol_quote_mapping m
+        INNER JOIN t_symbol s
+            ON s.lp_code = m.source_lp_code
+            AND s.symbol = m.source_symbol
+            AND s.status = 1
+        INNER JOIN t_symbol_group_visibility v
+            ON v.symbol = m.platform_symbol
+            AND v.group_code = #{groupCode}
+            AND v.visible = 1
+        WHERE m.enabled = 1
+        ORDER BY m.platform_symbol ASC
+    </select>
+
+    <select id="selectBySymbol" resultMap="MarketSymbolRecordMap">
+        SELECT
+        <include refid="MarketSymbolColumns"/>
+        FROM t_symbol
+        WHERE lp_code = 'GODSA' AND symbol = #{symbol}
+    </select>
+
+    <select id="selectVisibleTradingSymbol" resultMap="MarketSymbolWithSpecRecordMap">
+        SELECT
+        <include refid="MarketPlatformSymbolWithSpecColumnsAliased"/>
+        FROM t_symbol_quote_mapping m
+        INNER JOIN t_symbol s
+            ON s.lp_code = m.source_lp_code
+            AND s.symbol = m.source_symbol
+            AND s.status = 1
+        INNER JOIN t_symbol_group_visibility v
+            ON v.symbol = m.platform_symbol
+            AND v.group_code = #{groupCode}
+            AND v.visible = 1
+        WHERE m.enabled = 1
+            AND UPPER(m.platform_symbol) = UPPER(#{symbol})
+        LIMIT 1
+    </select>
+
+    <insert id="insertIgnoreSymbols">
+        INSERT IGNORE INTO t_symbol (
+            id,
+            lp_code,
+            symbol,
+            category,
+            market_code,
+            base_currency,
+            quote_currency,
+            price_precision,
+            qty_precision,
+            status
+        ) VALUES
+        <foreach collection="records" item="record" separator=",">
+            (
+                #{record.id},
+                #{record.lpCode},
+                #{record.symbol},
+                #{record.category},
+                #{record.marketCode},
+                #{record.baseCurrency},
+                #{record.quoteCurrency},
+                #{record.pricePrecision},
+                #{record.qtyPrecision},
+                #{record.status}
+            )
+        </foreach>
+    </insert>
+</mapper>

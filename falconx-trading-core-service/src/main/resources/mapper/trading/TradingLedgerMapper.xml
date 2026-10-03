@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingLedgerMapper">
+
+    <resultMap id="tradingLedgerRecordMap" type="com.falconx.trading.repository.mapper.record.TradingLedgerRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="user_id" javaType="java.lang.Long"/>
+            <arg column="account_id" javaType="java.lang.Long"/>
+            <arg column="biz_type" javaType="java.lang.Integer"/>
+            <arg column="idempotency_key" javaType="java.lang.String"/>
+            <arg column="reference_no" javaType="java.lang.String"/>
+            <arg column="amount" javaType="java.math.BigDecimal"/>
+            <arg column="original_amount" javaType="java.math.BigDecimal"/>
+            <arg column="original_currency" javaType="java.lang.String"/>
+            <arg column="fx_rate_at_settlement" javaType="java.math.BigDecimal"/>
+            <arg column="balance_before" javaType="java.math.BigDecimal"/>
+            <arg column="balance_after" javaType="java.math.BigDecimal"/>
+            <arg column="frozen_before" javaType="java.math.BigDecimal"/>
+            <arg column="frozen_after" javaType="java.math.BigDecimal"/>
+            <arg column="margin_used_before" javaType="java.math.BigDecimal"/>
+            <arg column="margin_used_after" javaType="java.math.BigDecimal"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="tradingSwapSettlementRecordMap" type="com.falconx.trading.repository.mapper.record.TradingSwapSettlementRecord">
+        <constructor>
+            <idArg column="ledger_id" javaType="java.lang.Long"/>
+            <arg column="position_id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="side_code" javaType="java.lang.Integer"/>
+            <arg column="biz_type_code" javaType="java.lang.Integer"/>
+            <arg column="amount" javaType="java.math.BigDecimal"/>
+            <arg column="balance_after" javaType="java.math.BigDecimal"/>
+            <arg column="rollover_at_text" javaType="java.lang.String"/>
+            <arg column="settled_at" javaType="java.time.LocalDateTime"/>
+            <arg column="reference_no" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="insertTradingLedger" parameterType="com.falconx.trading.repository.mapper.record.TradingLedgerRecord">
+        INSERT INTO t_ledger (
+            id,
+            user_id,
+            account_id,
+            biz_type,
+            idempotency_key,
+            reference_no,
+            amount,
+            original_amount,
+            original_currency,
+            fx_rate_at_settlement,
+            balance_before,
+            balance_after,
+            frozen_before,
+            frozen_after,
+            margin_used_before,
+            margin_used_after,
+            created_at
+        ) VALUES (
+            #{id},
+            #{userId},
+            #{accountId},
+            #{bizTypeCode},
+            #{idempotencyKey},
+            #{referenceNo},
+            #{amount},
+            #{originalAmount},
+            #{originalCurrency},
+            #{fxRateAtSettlement},
+            #{balanceBefore},
+            #{balanceAfter},
+            #{frozenBefore},
+            #{frozenAfter},
+            #{marginUsedBefore},
+            #{marginUsedAfter},
+            #{createdAt}
+        )
+    </insert>
+
+    <!-- 2026-05-26 Sprint 3 C1：批量 INSERT，配合 applyOrderPlacementAccountChange
+         一次写 3 条 ledger（biz_type ORDER_MARGIN_RESERVED / TRADE_FEE / ORDER_MARGIN_USED_CONFIRM）。
+         每行字段与 insertTradingLedger 完全对齐，仅 VALUES 列表用 foreach。 -->
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO t_ledger (
+            id,
+            user_id,
+            account_id,
+            biz_type,
+            idempotency_key,
+            reference_no,
+            amount,
+            original_amount,
+            original_currency,
+            fx_rate_at_settlement,
+            balance_before,
+            balance_after,
+            frozen_before,
+            frozen_after,
+            margin_used_before,
+            margin_used_after,
+            created_at
+        ) VALUES
+        <foreach collection="list" item="row" separator=",">
+            (
+                #{row.id},
+                #{row.userId},
+                #{row.accountId},
+                #{row.bizTypeCode},
+                #{row.idempotencyKey},
+                #{row.referenceNo},
+                #{row.amount},
+                #{row.originalAmount},
+                #{row.originalCurrency},
+                #{row.fxRateAtSettlement},
+                #{row.balanceBefore},
+                #{row.balanceAfter},
+                #{row.frozenBefore},
+                #{row.frozenAfter},
+                #{row.marginUsedBefore},
+                #{row.marginUsedAfter},
+                #{row.createdAt}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectByUserId" resultMap="tradingLedgerRecordMap">
+        SELECT id,
+               user_id,
+               account_id,
+               biz_type,
+               idempotency_key,
+               reference_no,
+               amount,
+               original_amount,
+               original_currency,
+               fx_rate_at_settlement,
+               balance_before,
+               balance_after,
+               frozen_before,
+               frozen_after,
+               margin_used_before,
+               margin_used_after,
+               created_at
+        FROM t_ledger
+        WHERE user_id = #{userId}
+        ORDER BY created_at ASC, id ASC
+        LIMIT 1000
+    </select>
+
+    <select id="selectByUserIdPaginated" resultMap="tradingLedgerRecordMap">
+        SELECT id,
+               user_id,
+               account_id,
+               biz_type,
+               idempotency_key,
+               reference_no,
+               amount,
+               original_amount,
+               original_currency,
+               fx_rate_at_settlement,
+               balance_before,
+               balance_after,
+               frozen_before,
+               frozen_after,
+               margin_used_before,
+               margin_used_after,
+               created_at
+        FROM t_ledger
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(1)
+        FROM t_ledger
+        WHERE user_id = #{userId}
+    </select>
+
+    <!-- 2026-05-20: 资金流水筛选 — 业务类型 + 时间范围（全部可空） -->
+    <select id="selectByUserIdFiltered" resultMap="tradingLedgerRecordMap">
+        SELECT id,
+               user_id,
+               account_id,
+               biz_type,
+               idempotency_key,
+               reference_no,
+               amount,
+               original_amount,
+               original_currency,
+               fx_rate_at_settlement,
+               balance_before,
+               balance_after,
+               frozen_before,
+               frozen_after,
+               margin_used_before,
+               margin_used_after,
+               created_at
+        FROM t_ledger
+        WHERE user_id = #{userId}
+        <if test="bizTypeCode != null">
+            AND biz_type = #{bizTypeCode}
+        </if>
+        <if test="fromTs != null">
+            AND created_at &gt;= #{fromTs}
+        </if>
+        <if test="toTs != null">
+            AND created_at &lt;= #{toTs}
+        </if>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserIdFiltered" resultType="long">
+        SELECT COUNT(1)
+        FROM t_ledger
+        WHERE user_id = #{userId}
+        <if test="bizTypeCode != null">
+            AND biz_type = #{bizTypeCode}
+        </if>
+        <if test="fromTs != null">
+            AND created_at &gt;= #{fromTs}
+        </if>
+        <if test="toTs != null">
+            AND created_at &lt;= #{toTs}
+        </if>
+    </select>
+
+    <!-- 2026-05-20: Swap 聚合查询 - 按 biz_type 分组 (6=SWAP_CHARGE / 7=SWAP_INCOME)。
+         referenceLike 传 "swap:{positionId}:%" 即按持仓维度；传 null 即按账户维度。 -->
+    <resultMap id="tradingSwapAggregateRowMap" type="com.falconx.trading.repository.mapper.record.TradingSwapAggregateRow">
+        <constructor>
+            <arg column="biz_type" javaType="int"/>
+            <arg column="total_amount" javaType="java.math.BigDecimal"/>
+            <arg column="entry_count" javaType="int"/>
+            <arg column="first_at" javaType="java.time.LocalDateTime"/>
+            <arg column="last_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectSwapAggregate" resultMap="tradingSwapAggregateRowMap">
+        SELECT
+            biz_type        AS biz_type,
+            SUM(amount)     AS total_amount,
+            COUNT(*)        AS entry_count,
+            MIN(created_at) AS first_at,
+            MAX(created_at) AS last_at
+        FROM t_ledger
+        WHERE biz_type IN (6, 7)
+        <if test="userId != null">
+            AND user_id = #{userId}
+        </if>
+        <if test="referenceLike != null">
+            AND reference_no LIKE #{referenceLike}
+        </if>
+        <if test="fromTs != null">
+            AND created_at &gt;= #{fromTs}
+        </if>
+        <if test="toTs != null">
+            AND created_at &lt;= #{toTs}
+        </if>
+        GROUP BY biz_type
+    </select>
+
+    <select id="selectSwapSettlementsByUserId" resultMap="tradingSwapSettlementRecordMap">
+        SELECT l.id AS ledger_id,
+               CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(l.reference_no, ':', 2), ':', -1) AS UNSIGNED) AS position_id,
+               p.symbol AS symbol,
+               p.side AS side_code,
+               l.biz_type AS biz_type_code,
+               l.amount AS amount,
+               l.balance_after AS balance_after,
+               SUBSTRING(l.reference_no, LOCATE(':', l.reference_no, LOCATE(':', l.reference_no) + 1) + 1) AS rollover_at_text,
+               l.created_at AS settled_at,
+               l.reference_no AS reference_no
+        FROM t_ledger l
+        LEFT JOIN t_position p
+          ON p.id = CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(l.reference_no, ':', 2), ':', -1) AS UNSIGNED)
+        WHERE l.user_id = #{userId}
+          AND l.biz_type IN (6, 7)
+        ORDER BY l.created_at DESC, l.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countSwapSettlementsByUserId" resultType="long">
+        SELECT COUNT(1)
+        FROM t_ledger
+        WHERE user_id = #{userId}
+          AND biz_type IN (6, 7)
+    </select>
+
+    <select id="countByUserIdAndIdempotencyKey" resultType="int">
+        SELECT COUNT(1)
+        FROM t_ledger
+        WHERE user_id = #{userId}
+          AND idempotency_key = #{idempotencyKey}
+    </select>
+
+    <select id="selectLatestSwapSettlementAt" resultType="java.time.LocalDateTime">
+        SELECT created_at
+        FROM t_ledger
+        WHERE user_id = #{userId}
+          AND biz_type IN (6, 7)
+          AND reference_no LIKE CONCAT('swap:', #{positionId}, ':%')
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    </select>
+</mapper>

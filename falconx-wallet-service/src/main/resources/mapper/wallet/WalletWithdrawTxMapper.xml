@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.wallet.repository.mapper.WalletWithdrawTxMapper">
+
+    <resultMap id="recordMap" type="com.falconx.wallet.repository.mapper.record.WalletWithdrawTxRecord">
+        <constructor>
+            <idArg column="id"                  javaType="java.lang.Long"/>
+            <arg   column="withdraw_order_id"   javaType="java.lang.Long"/>
+            <arg   column="user_id"             javaType="java.lang.Long"/>
+            <arg   column="network"             javaType="java.lang.String"/>
+            <arg   column="from_address"        javaType="java.lang.String"/>
+            <arg   column="target_address"      javaType="java.lang.String"/>
+            <arg   column="amount"              javaType="java.math.BigDecimal"/>
+            <arg   column="nonce"               javaType="java.lang.Long"/>
+            <arg   column="gas_price"           javaType="java.math.BigDecimal"/>
+            <arg   column="gas_used"            javaType="java.math.BigDecimal"/>
+            <arg   column="gas_fee_usd"         javaType="java.math.BigDecimal"/>
+            <arg   column="tx_hash"             javaType="java.lang.String"/>
+            <arg   column="block_number"        javaType="java.lang.Long"/>
+            <arg   column="confirmations"       javaType="java.lang.Integer"/>
+            <arg   column="status"              javaType="java.lang.Integer"/>
+            <arg   column="failure_code"        javaType="java.lang.String"/>
+            <arg   column="failure_reason"      javaType="java.lang.String"/>
+            <arg   column="broadcast_at"        javaType="java.time.LocalDateTime"/>
+            <arg   column="confirmed_at"        javaType="java.time.LocalDateTime"/>
+            <arg   column="failed_at"           javaType="java.time.LocalDateTime"/>
+            <arg   column="created_at"          javaType="java.time.LocalDateTime"/>
+            <arg   column="updated_at"          javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="cols">
+        id, withdraw_order_id, user_id, network, from_address, target_address, amount,
+        nonce, gas_price, gas_used, gas_fee_usd,
+        tx_hash, block_number, confirmations,
+        status, failure_code, failure_reason,
+        broadcast_at, confirmed_at, failed_at, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.falconx.wallet.repository.mapper.record.WalletWithdrawTxRecord">
+        INSERT INTO t_withdraw_tx (<include refid="cols"/>) VALUES (
+            #{id}, #{withdrawOrderId}, #{userId}, #{network}, #{fromAddress}, #{targetAddress}, #{amount},
+            #{nonce}, #{gasPrice}, #{gasUsed}, #{gasFeeUsd},
+            #{txHash}, #{blockNumber}, #{confirmations},
+            #{status}, #{failureCode}, #{failureReason},
+            #{broadcastAt}, #{confirmedAt}, #{failedAt}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_withdraw_tx WHERE id = #{id}
+    </select>
+
+    <select id="selectByWithdrawOrderId" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_withdraw_tx WHERE withdraw_order_id = #{withdrawOrderId}
+    </select>
+
+    <select id="selectBroadcastedBefore" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_withdraw_tx
+        WHERE status = 1 AND broadcast_at &lt;= #{threshold}
+        ORDER BY broadcast_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="markBroadcastAtomic">
+        UPDATE t_withdraw_tx
+        SET status = 1,
+            tx_hash = #{txHash},
+            gas_price = #{gasPrice},
+            broadcast_at = #{broadcastAt},
+            updated_at = #{broadcastAt}
+        WHERE id = #{id} AND status = 0
+    </update>
+
+    <update id="markConfirmedAtomic">
+        UPDATE t_withdraw_tx
+        SET status = 2,
+            block_number = #{blockNumber},
+            confirmations = #{confirmations},
+            gas_used = #{gasUsed},
+            gas_fee_usd = #{gasFeeUsd},
+            confirmed_at = #{confirmedAt},
+            updated_at = #{confirmedAt}
+        WHERE id = #{id} AND status = 1
+    </update>
+
+    <update id="markFailedAtomic">
+        UPDATE t_withdraw_tx
+        SET status = 3,
+            failure_code = #{failureCode},
+            failure_reason = #{failureReason},
+            failed_at = #{failedAt},
+            updated_at = #{failedAt}
+        WHERE id = #{id} AND status IN (0, 1)
+    </update>
+
+    <update id="updateConfirmations">
+        UPDATE t_withdraw_tx
+        SET confirmations = #{confirmations},
+            updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{id} AND status = 1
+    </update>
+
+</mapper>

@@ -1,0 +1,17 @@
+falconx:
+  trading:
+    # 2026-05-26 Sprint 3 S6：测试场景下走同步路径，避免 close 主事务 commit 后
+    # t_trade/t_liquidation_log 还在 outbox 队列里，导致 SpringBootTest 集成断言失败。
+    position-close:
+      async-post-process:
+        enabled: false
+    # 2026-05-29 STAGE-14C1 Task 11：集成测试关闭 LeverageTierResolver 的 30s 本地缓存
+    # （cache-refresh-seconds=0 → 每次 resolve 都重查 DB）。共享 falconx_trading_it 库 + 单一
+    # Spring 上下文下，不同 IT 类会给同一 symbol（如 BTCUSDT）注入不同 mmRate 的 tier（强平 IT 用
+    # 0.005、StopOut IT 用 0.01），缓存会让后跑的类拿到前一类的 tier 导致强平价漂移。关掉缓存即可保证
+    # 每个 @BeforeEach 注入的 tier 立即生效、测试相互隔离。生产 30s 缓存不受影响（仅 stage5 profile 覆盖）。
+    tier:
+      cache-refresh-seconds: 0
+    # STAGE-14C2 Task 5：IT 关闭 FX_PAUSED 行为开关缓存，保证读到 V31 seed 实时值（与 tier 同口径）
+    fx-pause:
+      cache-refresh-seconds: 0

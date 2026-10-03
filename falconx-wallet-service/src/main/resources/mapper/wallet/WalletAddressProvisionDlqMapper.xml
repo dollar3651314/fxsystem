@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.wallet.repository.mapper.WalletAddressProvisionDlqMapper">
+
+    <resultMap id="recordMap" type="com.falconx.wallet.repository.mapper.record.WalletAddressProvisionDlqRecord">
+        <constructor>
+            <idArg column="id"                 javaType="java.lang.Long"/>
+            <arg   column="event_id"           javaType="java.lang.String"/>
+            <arg   column="user_id"            javaType="java.lang.Long"/>
+            <arg   column="uid"                javaType="java.lang.String"/>
+            <arg   column="email"              javaType="java.lang.String"/>
+            <arg   column="attempt_count"      javaType="java.lang.Integer"/>
+            <arg   column="status"             javaType="java.lang.Integer"/>
+            <arg   column="last_error_code"    javaType="java.lang.String"/>
+            <arg   column="last_error_message" javaType="java.lang.String"/>
+            <arg   column="last_attempt_at"    javaType="java.time.LocalDateTime"/>
+            <arg   column="resolved_at"        javaType="java.time.LocalDateTime"/>
+            <arg   column="created_at"         javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="cols">
+        id, event_id, user_id, uid, email, attempt_count, status,
+        last_error_code, last_error_message, last_attempt_at, resolved_at, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.falconx.wallet.repository.mapper.record.WalletAddressProvisionDlqRecord">
+        INSERT INTO t_wallet_address_provision_dlq (<include refid="cols"/>) VALUES (
+            #{id}, #{eventId}, #{userId}, #{uid}, #{email}, #{attemptCount}, #{status},
+            #{lastErrorCode}, #{lastErrorMessage}, #{lastAttemptAt}, #{resolvedAt}, #{createdAt}
+        )
+    </insert>
+
+    <update id="upsertOnDuplicate">
+        UPDATE t_wallet_address_provision_dlq
+        SET attempt_count = attempt_count + 1,
+            last_error_code = #{lastErrorCode},
+            last_error_message = #{lastErrorMessage},
+            last_attempt_at = #{lastAttemptAt}
+        WHERE event_id = #{eventId} AND status = 0
+    </update>
+
+    <select id="selectById" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_wallet_address_provision_dlq WHERE id = #{id}
+    </select>
+
+    <select id="selectByEventId" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_wallet_address_provision_dlq WHERE event_id = #{eventId}
+    </select>
+
+    <select id="selectPaginated" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_wallet_address_provision_dlq
+        WHERE 1 = 1
+        <if test="status != null">AND status = #{status}</if>
+        <if test="userId != null">AND user_id = #{userId}</if>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countFiltered" resultType="long">
+        SELECT COUNT(1) FROM t_wallet_address_provision_dlq
+        WHERE 1 = 1
+        <if test="status != null">AND status = #{status}</if>
+        <if test="userId != null">AND user_id = #{userId}</if>
+    </select>
+
+    <update id="markResolved">
+        UPDATE t_wallet_address_provision_dlq
+        SET status = 1, resolved_at = #{resolvedAt}
+        WHERE id = #{id} AND status = 0
+    </update>
+</mapper>

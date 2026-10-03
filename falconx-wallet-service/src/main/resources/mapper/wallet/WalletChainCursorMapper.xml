@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.wallet.repository.mapper.WalletChainCursorMapper">
+
+    <resultMap id="walletChainCursorRecordMap" type="com.falconx.wallet.repository.mapper.record.WalletChainCursorRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="chain" javaType="java.lang.String"/>
+            <arg column="cursor_type" javaType="java.lang.String"/>
+            <arg column="cursor_value" javaType="java.lang.String"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByChain" resultMap="walletChainCursorRecordMap">
+        SELECT id, chain, cursor_type, cursor_value, updated_at
+        FROM t_wallet_chain_cursor
+        WHERE chain = #{chain}
+    </select>
+
+    <insert id="insertWalletChainCursor" parameterType="com.falconx.wallet.repository.mapper.record.WalletChainCursorRecord">
+        INSERT INTO t_wallet_chain_cursor (
+            id,
+            chain,
+            cursor_type,
+            cursor_value,
+            updated_at
+        ) VALUES (
+            #{id},
+            #{chain},
+            #{cursorType},
+            #{cursorValue},
+            #{updatedAt}
+        )
+    </insert>
+
+    <update id="updateCursorValueByChain">
+        UPDATE t_wallet_chain_cursor
+        SET cursor_value = #{cursorValue},
+            updated_at = #{updatedAt}
+        WHERE chain = #{chain}
+    </update>
+</mapper>

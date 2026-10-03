@@ -1,0 +1,163 @@
+spring:
+  # 2026-05-27 Sprint 6 顺序5：JDK 25 + Spring Boot 4 虚拟线程（Tomcat 请求 + @Async + @Scheduled）。
+  # JEP 491 已解决 synchronized pinning；自定义线程池（分区 executor/dispatcher/扫块 poller）不受影响仍用平台线程。
+  threads:
+    virtual:
+      enabled: true
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  application:
+    name: falconx-market-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/falconx_market?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${FALCONX_MARKET_DB_USERNAME}
+    password: ${FALCONX_MARKET_DB_PASSWORD}
+    hikari:
+      # STAGE-12 perf：默认 HikariCP idleTimeout/maxLifetime 不主动 evict，
+      # 实测 MySQL processlist 多条 Sleep>16000s（4-7h）。显式收紧到 10min/30min。
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      keepalive-time: 300000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${FALCONX_REDIS_HOST:localhost}
+      port: ${FALCONX_REDIS_PORT:6380}
+  kafka:
+    bootstrap-servers: localhost:9092
+    listener:
+      missing-topics-fatal: false
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # 2026-05-26 Sprint 5 A1：批量 + 压缩。market 高频 price.tick / kline.update，
+      # 攒批 10ms 后压缩 lz4 发出，减少网络流量 + Kafka broker 磁盘 IO。
+      batch-size: 16384
+      properties:
+        linger.ms: 10
+        compression.type: lz4
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+
+server:
+  port: 18082
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level --- [%15.15t] [traceId=%X{traceId:-}] %logger{39} : %msg%n%ex"
+
+falconx:
+  market:
+    lp:
+      enabled: true
+      code: ${FALCONX_MARKET_LP_CODE:GODSA}
+      domain: ${FALCONX_MARKET_LP_DOMAIN:${domain:}}
+      app-id: ${FALCONX_MARKET_LP_APP_ID:${APP-ID:}}
+      token: ${FALCONX_MARKET_LP_TOKEN:${token:}}
+      secret-key: ${FALCONX_MARKET_LP_SECRET_KEY:${secretKey:}}
+      server-id: ${FALCONX_MARKET_LP_SERVER_ID:17}
+      meta-trade-version: ${FALCONX_MARKET_LP_META_TRADE_VERSION:${metaTradeVersion:4}}
+      meta-trader-id: ${FALCONX_MARKET_LP_META_TRADER_ID:${metaTraderId:${serverId:0}}}
+      connect-timeout: 10s
+      reconnect-interval: 5s
+      symbol-whitelist-refresh-cron: "0 */1 * * * *"
+      symbol-whitelist-refresh-zone: UTC
+    redis:
+      quote-ttl: 10s
+      reference-quote-ttl: 30d
+      trading-schedule-ttl: 25h
+      trading-schedule-refresh-cron: "0 0 0 * * *"
+      trading-schedule-refresh-zone: UTC
+    analytics:
+      database: falconx_market_analytics
+      quote-batch-size: 200
+      quote-flush-interval: 10000
+      jdbc-url: jdbc:clickhouse://${FALCONX_CLICKHOUSE_HOST:localhost}:${FALCONX_CLICKHOUSE_PORT:8123}/falconx_market_analytics
+      username: ${FALCONX_CLICKHOUSE_USERNAME:default}
+      # STAGE-13 fix：deploy/clickhouse/users.d/default-user.xml 设的密码是 falconx，
+      # 之前 application.yml password 为空导致认证失败（local-start.sh 触发 docker compose
+      # up -d 后容器加载新 user xml，强制要求密码）。dev 默认 falconx，生产用 env 注入。
+      password: ${FALCONX_CLICKHOUSE_PASSWORD:falconx}
+    kafka:
+      price-tick-topic: falconx.market.price.tick
+      kline-update-topic: falconx.market.kline.update
+      fx-rate-update-topic: falconx.market.fx.rate.update
+    stale:
+      max-age: 5s
+    # 2026-05-26 Sprint 3 S5（性能报告 §4 P0）：market 主链路 4 类下游异步化。
+    # async-downstream.enabled=true → ClickHouse / Kafka / WebSocket 推送 / K 线 finalized
+    # 走 dispatcher 分片异步；false → 回退同步路径（问题排查兜底）。
+    ingestion:
+      async-downstream:
+        enabled: true
+      downstream-dispatcher:
+        # 16 partition：CPU 16 核以下均能利用；demo 服务器 8 核可降到 8
+        partition-count: 16
+        # 每 partition 10000 任务缓冲，按 600 q/s / 16 = 37 q/s/partition，10000 缓冲 ~270s
+        queue-capacity: 10000
+    quote-quality:
+      unchanged-max-age: 1m
+      # 点差超过 mid 的 5% 视为异常，null 表示禁用
+      max-spread-rate: 0.05
+      # 单 tick 相对上一 mid 跳变超过 10% 视为异常，null 表示禁用
+      max-tick-jump-rate: 0.10
+      # 60 秒滑动窗口内 (max-min)/min 超过 5% 视为异常，null 表示禁用
+      max-volatility-rate: 0.05
+      volatility-window: 60s
+    kline:
+      intervals:
+        - 1m
+        - 5m
+        - 15m
+        - 1h
+        - 4h
+        - 1d
+      timezone: UTC
+    # STAGE-2-SYMBOL: 跨服务 internal RPC token（与 identity / trading 共用环境变量）
+    internal-api:
+      token: ${FALCONX_INTERNAL_API_TOKEN:falconx-internal-dev-token}
+    # STAGE-14A Task 3: FX 汇率子域参数
+    fx:
+      stale-threshold-seconds: 30
+      pause-threshold-seconds: 300
+      kafka-throttle-interval-ms: 1000
+      redis-ttl-seconds: 5
+
+# STAGE-11-OBS-RECON §14.5 actuator endpoints（运维 / canary / k8s probe 用，不暴露给前端）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers,prometheus,threaddump,heapdump
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+    loggers:
+      enabled: true
+  info:
+    git:
+      mode: simple
+    build:
+      enabled: true
+  metrics:
+    distribution:
+      # 仅对低基数 Timer（topic/eventType/outcome，约 24 组合）开 percentiles-histogram，
+      # 暴露 _seconds_bucket 供 Prometheus histogram_quantile 计算真 p95/p99。
+      # 注意：trading tick timers 按 symbol 打 tag（高基数），不在此开 histogram（见 deploy/monitoring）。
+      percentiles-histogram:
+        falconx.market.kafka.publish.duration: true
+      minimum-expected-value:
+        falconx.market.kafka.publish.duration: 1ms
+      maximum-expected-value:
+        falconx.market.kafka.publish.duration: 2s

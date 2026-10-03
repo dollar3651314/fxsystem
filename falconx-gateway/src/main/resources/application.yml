@@ -1,0 +1,120 @@
+spring:
+  application:
+    name: falconx-gateway
+  data:
+    redis:
+      host: ${FALCONX_REDIS_HOST:localhost}
+      port: ${FALCONX_REDIS_PORT:6380}
+
+server:
+  port: 18080
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level --- [%15.15t] [traceId=%X{traceId:-}] %logger{39} : %msg%n%ex"
+
+falconx:
+  # STAGE-13 系统配置中心：连 console 拉全量配置 + 订阅 Redis pub/sub
+  system-config:
+    enabled: true
+    console-base-url: ${FALCONX_CONSOLE_BASE_URL:http://localhost:18085}
+    internal-token: ${FALCONX_INTERNAL_API_TOKEN:falconx-internal-dev-token}
+  gateway:
+    routes:
+      identity-base-url: http://localhost:18081
+      market-base-url: http://localhost:18082
+      trading-base-url: http://localhost:18083
+      wallet-base-url: http://localhost:18084
+      console-base-url: http://localhost:18085
+    security:
+      public-key-pem: ${FALCONX_GATEWAY_PUBLIC_KEY_PEM}
+      # STAGE-2-REALTIME-DATA Phase 2：console-service 公钥（admin WS 验签）
+      console-public-key-pem: ${FALCONX_GATEWAY_CONSOLE_PUBLIC_KEY_PEM:}
+      client-ip-header: X-Client-Ip
+      auth-request-rate-limit-per-minute: 20
+      trading-request-rate-limit-per-second: 10
+      global-request-rate-limit-per-minute: 200
+      connect-timeout-millis: 1000
+      response-timeout-millis: 5000
+      # internal token：业务服务 /internal/v1/** 路由时注入 X-Internal-Token header
+      # dev/test 默认值；prod/staging 必须通过 FALCONX_INTERNAL_API_TOKEN 环境变量覆盖（fail-closed）
+      internal-api-token: ${FALCONX_INTERNAL_API_TOKEN:falconx-internal-dev-token}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      # 2026-05-26 Sprint 5 A6：slow-call-duration 区分服务 SLA。
+      # identity（登录注册 RPC，期望快）：1s
+      # market（行情读 + K线历史）：2s
+      #   2026-06-08：原 500ms 是按“行情读走 Redis 很快”设的，但 market-route 同时承载
+      #   K线历史查询（从 ClickHouse 读 ~万级行 + 序列化数百根 K线），端到端合法就要 0.2~0.65s。
+      #   前端启动请求风暴时大量 kline 调用 >500ms → slow-call-rate 破 50% → 熔断 10s 全 market 504
+      #   （实测 failure-rate=0%、纯慢调用误触发）。提到 2s 对齐 trading，真正卡死仍会触发。
+      # trading（下单/平仓事务）：2s
+      # wallet（链上 RPC，受 Alchemy 影响）：5s
+      # console（admin 业务）：3s
+      identity-route:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 1s
+        permitted-number-of-calls-in-half-open-state: 5
+        wait-duration-in-open-state: 10s
+      market-route:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        permitted-number-of-calls-in-half-open-state: 5
+        wait-duration-in-open-state: 10s
+      trading-route:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        permitted-number-of-calls-in-half-open-state: 5
+        wait-duration-in-open-state: 10s
+      wallet-route:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 5s
+        permitted-number-of-calls-in-half-open-state: 5
+        wait-duration-in-open-state: 10s
+      console-route:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 3s
+        permitted-number-of-calls-in-half-open-state: 5
+        wait-duration-in-open-state: 10s
+
+# STAGE-11-OBS-RECON §14.5 actuator endpoints（运维 / canary / k8s probe 用，不暴露给前端）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers,prometheus,threaddump,heapdump
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+    loggers:
+      enabled: true
+  info:
+    git:
+      mode: simple
+    build:
+      enabled: true

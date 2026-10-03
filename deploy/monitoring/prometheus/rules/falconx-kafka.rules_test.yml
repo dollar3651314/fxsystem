@@ -1,0 +1,84 @@
+# promtool 单测：falconx-kafka.rules.yml
+rule_files:
+  - falconx-kafka.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # FalconxKafkaPriceTickLagHigh：price.tick lag >50000 触发。
+  - interval: 1m
+    input_series:
+      - series: 'kafka_consumergroup_lag{topic="falconx.market.price.tick", consumergroup="falconx-trading-core-service", partition="0"}'
+        values: "60000 60000"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxKafkaPriceTickLagHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P0
+              topic: falconx.market.price.tick
+              consumergroup: falconx-trading-core-service
+            exp_annotations:
+              summary: "Kafka price.tick lag 过高：falconx-trading-core-service"
+              description: "falconx.market.price.tick 消费组 falconx-trading-core-service lag > 50000，trading 消费跟不上行情推送。"
+
+  # price.tick lag 200 不触发 high。
+  - interval: 1m
+    input_series:
+      - series: 'kafka_consumergroup_lag{topic="falconx.market.price.tick", consumergroup="falconx-trading-core-service", partition="0"}'
+        values: "200 200"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxKafkaPriceTickLagHigh
+        exp_alerts: []
+
+  # FalconxKafkaPriceTickLagGrowing：3m 窗口持续增长触发（即便未到 50000）。
+  - interval: 1m
+    input_series:
+      - series: 'kafka_consumergroup_lag{topic="falconx.market.price.tick", consumergroup="falconx-trading-core-service", partition="0"}'
+        values: "100 200 400 800"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: FalconxKafkaPriceTickLagGrowing
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              topic: falconx.market.price.tick
+              consumergroup: falconx-trading-core-service
+            exp_annotations:
+              summary: "Kafka price.tick lag 持续增长：falconx-trading-core-service"
+              description: "falconx.market.price.tick lag 在 3 分钟窗口内持续增长，消费速率落后于生产速率。"
+
+  # FalconxKafkaKlineLagHigh：kline.update lag >1000 触发。
+  - interval: 1m
+    input_series:
+      - series: 'kafka_consumergroup_lag{topic="falconx.market.kline.update", consumergroup="falconx-trading-core-service", partition="0"}'
+        values: "1500 1500"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxKafkaKlineLagHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P1
+              topic: falconx.market.kline.update
+              consumergroup: falconx-trading-core-service
+            exp_annotations:
+              summary: "Kafka kline.update lag 过高：falconx-trading-core-service"
+              description: "falconx.market.kline.update 消费组 falconx-trading-core-service lag > 1000。"
+
+  # FalconxKafkaLowFreqLagHigh：低频事件 lag >100 触发。
+  - interval: 1m
+    input_series:
+      - series: 'kafka_consumergroup_lag{topic="falconx.wallet.deposit.confirmed", consumergroup="falconx-trading-core-service", partition="0"}'
+        values: "150 150"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FalconxKafkaLowFreqLagHigh
+        exp_alerts:
+          - exp_labels:
+              severity: P2
+              topic: falconx.wallet.deposit.confirmed
+              consumergroup: falconx-trading-core-service
+            exp_annotations:
+              summary: "Kafka 低频事件 lag 过高：falconx.wallet.deposit.confirmed"
+              description: "低频事件 topic falconx.wallet.deposit.confirmed 消费组 falconx-trading-core-service lag > 100。"

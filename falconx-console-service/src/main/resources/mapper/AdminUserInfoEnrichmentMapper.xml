@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.console.repository.mapper.AdminUserInfoEnrichmentMapper">
+
+    <resultMap id="adminUserInfoMap"
+               type="com.falconx.console.repository.mapper.record.AdminUserInfoRecord">
+        <constructor>
+            <idArg column="user_id" javaType="java.lang.Long"/>
+            <arg column="uid" javaType="java.lang.String"/>
+            <arg column="email" javaType="java.lang.String"/>
+            <arg column="first_name" javaType="java.lang.String"/>
+            <arg column="last_name" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <!--
+      跨 schema 单查：identity 端拿 uid / email（t_user）+ 姓名（t_user_profile，LEFT JOIN 容忍未填）。
+      一次 IN 取全部 userId，调用方按 userId 装配回各 admin DTO，避免 N+1。
+    -->
+    <select id="selectByUserIds" resultMap="adminUserInfoMap">
+        SELECT
+            u.id AS user_id,
+            u.uid,
+            u.email,
+            p.first_name,
+            p.last_name
+        FROM falconx_identity.t_user u
+        LEFT JOIN falconx_identity.t_user_profile p
+            ON p.user_id = u.id
+        WHERE u.id IN
+            <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+                #{uid}
+            </foreach>
+    </select>
+</mapper>

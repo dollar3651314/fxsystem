@@ -1,0 +1,197 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  /* tabular-nums 全局生效，避免数字跳动 (DESIGN §5) */
+  font-variant-numeric: tabular-nums;
+  /* letter-spacing 强制为 0 (DESIGN §5 + 与 C 端规则一致) */
+  letter-spacing: 0;
+}
+
+/* prefers-reduced-motion: 全局降级为透明度变化 (DESIGN §8) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* STAGE-7-WITHDRAW §4 commit D: admin WS 推送状态变化时给行做 5s 高亮闪烁
+   AntD 行（每个单元格）background 来自 td；行级 class 走 tr 但实际颜色靠 td 渲染。 */
+@keyframes fx-row-flash-anim {
+  0%   { background-color: rgba(250, 173, 20, 0.28); }
+  100% { background-color: transparent; }
+}
+.fx-row-flash > td {
+  animation: fx-row-flash-anim 4.5s ease-out 1;
+}
+
+/* === 2026-05-19 与客户端品牌统一：通用工具类 ===
+   与 falconx-frontend/src/styles/global.css 同名规则保持语义一致，
+   开发同学在 admin 写 className="fx-mono" 等就能直接复用客户端肌肉记忆。 */
+
+.fx-mono {
+  font-family: var(--fx-mono-stack);
+  font-feature-settings: "tnum", "ss01", "zero";
+  letter-spacing: 0;
+}
+
+.fx-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fx-pnl-pos { color: var(--fx-pnl-pos); }
+.fx-pnl-neg { color: var(--fx-pnl-neg); }
+
+.fx-truncate {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* AntD Table 数据列默认上 mono：ID / hash / 地址 / 金额，
+   表头不动（headerColor 在 ConsoleAntdProvider 已设 muted 灰）。
+   数据细胞改 mono 后整体节奏跟客户端 console 表对齐。 */
+.ant-table-tbody > tr > td {
+  font-family: var(--fx-mono-stack);
+  font-feature-settings: "tnum";
+}
+.ant-table-tbody > tr > td .ant-tag,
+.ant-table-tbody > tr > td .ant-btn,
+.ant-table-tbody > tr > td .ant-typography {
+  /* tag / btn / typography 等子组件回退到 Inter，避免按钮文本太「数据感」 */
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+/* 让 admin 自定义页面里的标题 / 行文跟客户端 console route 风格对齐 */
+.fx-eyebrow {
+  font-family: var(--fx-mono-stack);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: var(--fx-eyebrow-letter);
+  text-transform: uppercase;
+  color: var(--fx-muted);
+}
+
+/* AntD Layout 在 Sider collapsed 时 logo 文字会溢出 — 加宽度限制 + 省略 */
+.ant-layout-sider-collapsed [class*="brand"] span {
+  display: none;
+}
+
+/* === 2026-05-20: 浏览器自动填充背景纠正（2026-06-04 主题化）===
+   Chrome/Edge 自动填充会把 input 背景刷成 #fafafa 黄白，与 console theme 冲突。
+   inset box-shadow 把 input 容器底色当 fake bg 盖住浏览器原生 bg，
+   text-fill-color 强制文字色，transition 5000s 兜底首帧闪烁。
+   颜色走 CSS 变量，深浅主题各自取 --fx-surface-2 / --fx-text，不再写死暗色。 */
+.ant-input:-webkit-autofill,
+.ant-input:-webkit-autofill:hover,
+.ant-input:-webkit-autofill:focus,
+.ant-input:-webkit-autofill:active,
+.ant-input-affix-wrapper input:-webkit-autofill,
+.ant-input-affix-wrapper input:-webkit-autofill:hover,
+.ant-input-affix-wrapper input:-webkit-autofill:focus,
+.ant-input-affix-wrapper input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 60px var(--fx-surface-2) inset !important;
+  -webkit-text-fill-color: var(--fx-text) !important;
+  caret-color: var(--fx-text);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* admin 内 input 文字色显式跟随主题，否则未填写状态下 prefix 图标右侧光标颜色继承父级灰 */
+.ant-input-affix-wrapper input {
+  color: var(--fx-text);
+  caret-color: var(--fx-cyan);
+}
+
+/* ============ FalconX H5 — console mobile 适配 ============
+ * AntD 组件 mobile 友好 overrides + safe-area。
+ */
+
+@media (max-width: 767px) {
+  /* AntD Layout safe-area */
+  .ant-layout {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* AntD Form labels + inputs mobile */
+  .ant-form-item-label {
+    padding-bottom: 4px !important;
+  }
+
+  .ant-input,
+  .ant-input-password,
+  .ant-select-selector,
+  .ant-input-number-input,
+  .ant-picker-input > input {
+    min-height: 40px !important;
+    font-size: 16px !important;
+  }
+
+  /* AntD Table 横滚 */
+  .ant-table-wrapper,
+  .ant-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ant-table-cell {
+    padding: 8px !important;
+    font-size: 13px;
+  }
+
+  /* AntD Modal mobile 全屏化 */
+  .ant-modal {
+    max-width: calc(100vw - 16px);
+    margin: 8px auto;
+  }
+
+  .ant-modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  /* AntD Drawer mobile 全宽 */
+  .ant-drawer-right .ant-drawer-content-wrapper,
+  .ant-drawer-left .ant-drawer-content-wrapper {
+    width: 100vw !important;
+    max-width: 100vw;
+  }
+
+  /* AntD Button touch target */
+  .ant-btn {
+    min-height: 36px;
+  }
+
+  .ant-btn-lg {
+    min-height: 44px;
+  }
+
+  /* AntD Pagination mobile */
+  .ant-pagination {
+    text-align: center;
+  }
+
+  .ant-pagination-item,
+  .ant-pagination-prev,
+  .ant-pagination-next {
+    min-width: 32px;
+    min-height: 32px;
+    line-height: 30px;
+  }
+
+  /* AntD Tabs mobile 横滚 */
+  .ant-tabs-nav-list {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  /* Sider mobile 收纳：定位 / 层级 / 抽屉开合由 AdminLayout 受控管理（collapsedWidth=0 +
+     fixed 浮层 + 背景遮罩），不再用 CSS 强制 fixed，避免折叠态 80px 浮层遮挡主内容。 */
+}

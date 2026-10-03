@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.identity.repository.mapper.RefreshTokenSessionMapper">
+
+    <resultMap id="refreshTokenSessionRecordMap" type="com.falconx.identity.repository.mapper.record.RefreshTokenSessionRecord">
+        <constructor>
+            <idArg column="jti" javaType="java.lang.String"/>
+            <arg column="user_id" javaType="java.lang.Long"/>
+            <arg column="expires_at" javaType="java.time.LocalDateTime"/>
+            <arg column="used" javaType="java.lang.Integer"/>
+            <arg column="issued_at" javaType="java.time.LocalDateTime"/>
+            <arg column="used_at" javaType="java.time.LocalDateTime"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="upsertRefreshTokenSession" parameterType="com.falconx.identity.repository.mapper.record.RefreshTokenSessionRecord">
+        INSERT INTO t_refresh_token_session (
+            jti,
+            user_id,
+            expires_at,
+            used,
+            issued_at,
+            used_at,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{jti},
+            #{userId},
+            #{expiresAt},
+            #{used},
+            #{issuedAt},
+            #{usedAt},
+            #{createdAt},
+            #{updatedAt}
+        )
+        ON DUPLICATE KEY UPDATE
+            user_id = VALUES(user_id),
+            expires_at = VALUES(expires_at),
+            used = VALUES(used),
+            issued_at = VALUES(issued_at),
+            used_at = VALUES(used_at),
+            updated_at = VALUES(updated_at)
+    </insert>
+
+    <select id="selectByJti" resultMap="refreshTokenSessionRecordMap">
+        SELECT jti, user_id, expires_at, used, issued_at, used_at, created_at, updated_at
+        FROM t_refresh_token_session
+        WHERE jti = #{jti}
+    </select>
+
+    <select id="selectByJtiForUpdate" resultMap="refreshTokenSessionRecordMap">
+        SELECT jti, user_id, expires_at, used, issued_at, used_at, created_at, updated_at
+        FROM t_refresh_token_session
+        WHERE jti = #{jti}
+        FOR UPDATE
+    </select>
+
+    <update id="markUsedIfUnused">
+        UPDATE t_refresh_token_session
+        SET used = 1,
+            used_at = #{usedAt},
+            updated_at = #{usedAt}
+        WHERE jti = #{jti}
+          AND used = 0
+    </update>
+
+    <update id="revokeAllByUserId">
+        UPDATE t_refresh_token_session
+        SET used = 1,
+            used_at = #{usedAt},
+            updated_at = #{usedAt}
+        WHERE user_id = #{userId}
+          AND used = 0
+    </update>
+</mapper>

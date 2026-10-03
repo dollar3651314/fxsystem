@@ -1,0 +1,128 @@
+/* falconx-console-frontend 设计 token —— 2026-05-19 切暗色 console 主题，
+ * 与 falconx-frontend/src/styles/tokens.css 完全对齐，统一品牌语言。
+ *
+ * 客户端 → 管理端 设计统一约定（docs/design/falconx-console-DESIGN.md §2 升级版）：
+ *   - 同一套 cyan/lime/红/amber 色谱
+ *   - JetBrains Mono 用于所有数据 / 识别码 / 金额 / 哈希
+ *   - 同款 FalconMark logo
+ *   - 同款 segmented control / status pill / hairline section divider */
+:root {
+  /* === 主品牌色 === （与客户端 --fx-cyan / --fx-lime 完全一致） */
+  --fx-console-primary: #54e6ff;
+  --fx-console-primary-hover: #7defff;
+  --fx-console-primary-active: #2dc7e5;
+  --fx-cyan: #54e6ff;
+  --fx-lime: #a8ff5c;
+
+  /* === 状态语义色 === （沿用客户端） */
+  --fx-console-success: #a8ff5c;
+  --fx-console-warning: #ffb84d;
+  --fx-console-error:   #ff3d57;
+  --fx-pnl-pos: #a8ff5c;
+  --fx-pnl-neg: #ff6378;
+
+  /* 高风险动作（保留原值，红色家族） */
+  --fx-console-high-risk-bg:     rgba(255, 61, 87, 0.08);
+  --fx-console-high-risk-border: rgba(255, 61, 87, 0.5);
+  --fx-console-high-risk-text:   #ff3d57;
+
+  /* === 暗色表面（与客户端 --fx-surface-1/2/3 对齐） === */
+  --fx-terminal-bg: #050608;
+  --fx-surface-1: #0b0e12;
+  --fx-surface-2: #11161c;
+  --fx-surface-3: #171d24;
+  --fx-text: #f4f7fb;
+  --fx-muted: #9aa4b2;
+  --fx-subtle: #687383;
+  --fx-border: rgba(255, 255, 255, 0.1);
+  --fx-border-strong: rgba(84, 230, 255, 0.22);
+  --fx-hairline: rgba(255, 255, 255, 0.08);
+  --fx-hairline-strong: rgba(255, 255, 255, 0.14);
+
+  /* === 排版 === */
+  --fx-mono-stack: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono",
+    Menlo, Consolas, "Liberation Mono", monospace;
+  --fx-eyebrow-letter: 0.18em;
+
+  /* 间距 / 圆角（与 C 端对齐） */
+  --fx-space-1: 4px;
+  --fx-space-2: 8px;
+  --fx-space-3: 12px;
+  --fx-space-4: 16px;
+  --fx-space-5: 20px;
+  --fx-space-6: 24px;
+  --fx-space-8: 32px;
+  --fx-radius-sm: 6px;
+  --fx-radius-md: 8px;
+  --fx-radius-lg: 12px;
+
+  /* Drawer 宽度档位 */
+  --fx-console-drawer-width-sm: 480px;
+  --fx-console-drawer-width-md: 640px;
+  --fx-console-drawer-width-lg: 800px;
+  --fx-console-drawer-width-xl: 1080px;
+
+  /* 自定义卡片/进度条语义变量（dark）—— Dashboard 等手写 CSS 走这套，主题切换时整体翻转 */
+  --fx-card-bg: linear-gradient(180deg, rgba(17, 22, 28, 0.7) 0%, rgba(11, 14, 18, 0.85) 100%);
+  --fx-card-border: rgba(255, 255, 255, 0.08);
+  --fx-card-shadow: none;
+  --fx-track-bg: rgba(255, 255, 255, 0.04);
+  --fx-rule-grad: linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent);
+  --fx-accent-soft: rgba(84, 230, 255, 0.08);
+}
+
+/* ===== 浅色主题覆盖（2026-06-04 新增，默认主题）=====
+ * 与客户端 falconx-frontend「Trading Floor Daylight / PRO LIGHT」同一套设计语言：
+ *   - 底色奶白偏冷、文本深炭、品牌 accents 加深保证 light bg 上的 WCAG 对比
+ *   - cyan 从 #54e6ff 调到 #0891b2（cyan-600），绿/红 PnL 加深
+ *   - dark 是 glow + backdrop；light 用 subtle 双层阴影做「纸卡」质感
+ * 触发：<html data-theme="light">（useThemeStore 持久化 + ThemeSwitch 切换，index.html 防 FOUC）。
+ * AntD 组件由 ConsoleAntdProvider 同步切 algorithm + token，不靠本块。
+ */
+:root[data-theme="light"] {
+  --fx-console-primary: #0891b2;
+  --fx-console-primary-hover: #06b6d4;
+  --fx-console-primary-active: #0e7490;
+  --fx-cyan: #0891b2;
+  --fx-lime: #15803d;
+
+  --fx-console-success: #16a34a;
+  --fx-console-warning: #d97706;
+  --fx-console-error:   #dc2626;
+  --fx-pnl-pos: #16a34a;
+  --fx-pnl-neg: #dc2626;
+
+  --fx-console-high-risk-bg:     rgba(220, 38, 38, 0.07);
+  --fx-console-high-risk-border: rgba(220, 38, 38, 0.45);
+  --fx-console-high-risk-text:   #b91c1c;
+
+  --fx-terminal-bg: #f4f7fb;
+  --fx-surface-1: #ffffff;
+  --fx-surface-2: #f8fafc;
+  --fx-surface-3: #eef5f9;
+  --fx-text: #0f172a;
+  --fx-muted: #475569;
+  --fx-subtle: #64748b;
+  --fx-border: rgba(15, 23, 42, 0.12);
+  --fx-border-strong: rgba(8, 145, 178, 0.32);
+  --fx-hairline: rgba(15, 23, 42, 0.07);
+  --fx-hairline-strong: rgba(15, 23, 42, 0.12);
+
+  --fx-card-bg: #ffffff;
+  --fx-card-border: rgba(15, 23, 42, 0.08);
+  --fx-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
+  --fx-track-bg: rgba(15, 23, 42, 0.06);
+  --fx-rule-grad: linear-gradient(90deg, rgba(15, 23, 42, 0.12), transparent);
+  --fx-accent-soft: rgba(8, 145, 178, 0.08);
+}
+
+html, body {
+  background: var(--fx-terminal-bg);
+  color: var(--fx-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Hiragino Sans GB",
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+  /* 深浅切换平滑过渡（仅底色/文字，避免大面积重排闪烁） */
+  transition: background-color 200ms ease, color 200ms ease;
+}

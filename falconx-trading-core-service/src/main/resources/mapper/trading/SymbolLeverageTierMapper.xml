@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.SymbolLeverageTierMapper">
+
+    <!-- constructor <arg> 顺序必须与 SymbolLeverageTierRecord 组件顺序严格一致：
+         id, symbol, group_code, tier_no, notional_lower, notional_upper,
+         max_leverage, mm_rate, enabled。 -->
+    <resultMap id="symbolLeverageTierRecordMap"
+               type="com.falconx.trading.repository.mapper.record.SymbolLeverageTierRecord">
+        <constructor>
+            <idArg column="id" javaType="java.lang.Long"/>
+            <arg column="symbol" javaType="java.lang.String"/>
+            <arg column="group_code" javaType="java.lang.String"/>
+            <arg column="tier_no" javaType="java.lang.Integer"/>
+            <arg column="notional_lower" javaType="java.math.BigDecimal"/>
+            <arg column="notional_upper" javaType="java.math.BigDecimal"/>
+            <arg column="max_leverage" javaType="java.lang.Integer"/>
+            <arg column="mm_rate" javaType="java.math.BigDecimal"/>
+            <arg column="enabled" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="tierColumns">
+        id, symbol, group_code, tier_no, notional_lower, notional_upper, max_leverage, mm_rate, enabled
+    </sql>
+
+    <select id="selectBySymbolAndGroup" resultMap="symbolLeverageTierRecordMap">
+        SELECT <include refid="tierColumns"/>
+        FROM t_symbol_leverage_tier
+        WHERE symbol = #{symbol}
+          AND group_code = #{groupCode}
+          AND enabled = 1
+        ORDER BY notional_lower ASC
+    </select>
+
+    <select id="selectById" resultMap="symbolLeverageTierRecordMap">
+        SELECT <include refid="tierColumns"/>
+        FROM t_symbol_leverage_tier
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.falconx.trading.repository.mapper.record.SymbolLeverageTierRecord">
+        INSERT INTO t_symbol_leverage_tier
+            (id, symbol, group_code, tier_no, notional_lower, notional_upper, max_leverage, mm_rate, enabled)
+        VALUES
+            (#{id}, #{symbol}, #{groupCode}, #{tierNo}, #{notionalLower}, #{notionalUpper},
+             #{maxLeverage}, #{mmRate}, #{enabled})
+    </insert>
+
+    <update id="updateById" parameterType="com.falconx.trading.repository.mapper.record.SymbolLeverageTierRecord">
+        UPDATE t_symbol_leverage_tier
+        SET notional_lower = #{notionalLower},
+            notional_upper = #{notionalUpper},
+            max_leverage   = #{maxLeverage},
+            mm_rate        = #{mmRate},
+            enabled        = #{enabled}
+        WHERE id = #{id}
+    </update>
+
+    <!-- master §7.4：tier 删除为软删（enabled=0），不物理删除 -->
+    <update id="softDeleteById">
+        UPDATE t_symbol_leverage_tier
+        SET enabled    = 0,
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 管理端分页：symbol/groupCode 可空=不过滤；列出全部档位（含软删 enabled=0）供 admin 查看 -->
+    <select id="selectPage" resultMap="symbolLeverageTierRecordMap">
+        SELECT <include refid="tierColumns"/>
+        FROM t_symbol_leverage_tier
+        <where>
+            <if test="symbol != null">AND symbol = #{symbol}</if>
+            <if test="groupCode != null">AND group_code = #{groupCode}</if>
+        </where>
+        ORDER BY symbol ASC, group_code ASC, tier_no ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countBy" resultType="long">
+        SELECT COUNT(*)
+        FROM t_symbol_leverage_tier
+        <where>
+            <if test="symbol != null">AND symbol = #{symbol}</if>
+            <if test="groupCode != null">AND group_code = #{groupCode}</if>
+        </where>
+    </select>
+</mapper>

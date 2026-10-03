@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingRiskMarketConfigMapper">
+
+    <resultMap id="tradingRiskMarketConfigRecordMap"
+               type="com.falconx.trading.repository.mapper.record.TradingRiskMarketConfigRecord">
+        <constructor>
+            <idArg column="market_code"                  javaType="java.lang.String"/>
+            <arg   column="concentration_threshold_usd"  javaType="java.math.BigDecimal"/>
+            <arg   column="is_enabled"                   javaType="java.lang.Integer"/>
+            <arg   column="created_at"                   javaType="java.time.LocalDateTime"/>
+            <arg   column="updated_at"                   javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectByMarketCode" resultMap="tradingRiskMarketConfigRecordMap">
+        SELECT market_code,
+               concentration_threshold_usd,
+               is_enabled,
+               created_at,
+               updated_at
+        FROM t_risk_market_config
+        WHERE market_code = #{marketCode}
+    </select>
+
+    <select id="selectAll" resultMap="tradingRiskMarketConfigRecordMap">
+        SELECT market_code, concentration_threshold_usd, is_enabled, created_at, updated_at
+        FROM t_risk_market_config
+        ORDER BY market_code ASC
+    </select>
+
+    <update id="updateAdminByMarketCode">
+        UPDATE t_risk_market_config
+        SET concentration_threshold_usd = #{concentrationThresholdUsd},
+            is_enabled                  = #{isEnabled},
+            updated_at                  = #{updatedAt}
+        WHERE market_code = #{marketCode}
+    </update>
+
+</mapper>

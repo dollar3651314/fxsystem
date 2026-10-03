@@ -1,0 +1,82 @@
+# FalconX Prometheus 抓取与告警配置（本地验证默认）
+#
+# 本文件默认面向「本地全栈验证」：6 个后端服务由 local-start.sh 以 screen 进程跑在宿主
+# localhost:1808x，Prometheus 容器经 host.docker.internal 抓取。
+#
+# 生产/演示档（docker-compose.prod.yml，服务在同一 docker 网络）只需把各 job 的 target 改为
+# 服务 DNS 名 + 端口，例如：
+#   gateway        -> gateway:18080
+#   identity       -> identity-service:18081
+#   market         -> market-service:18082
+#   trading-core   -> trading-core-service:18083
+#   wallet         -> wallet-service:18084
+#   console        -> console-service:18085
+# 并把 Prometheus 容器接入 falconx 网络。其余（rule_files / alerting）保持不变。
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: falconx
+
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  - job_name: falconx-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:18080"]
+        labels:
+          service: gateway
+
+  - job_name: falconx-identity
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:18081"]
+        labels:
+          service: identity
+
+  - job_name: falconx-market
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:18082"]
+        labels:
+          service: market
+
+  - job_name: falconx-trading-core
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:18083"]
+        labels:
+          service: trading-core
+
+  - job_name: falconx-wallet
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:18084"]
+        labels:
+          service: wallet
+
+  - job_name: falconx-console
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:18085"]
+        labels:
+          service: console
+
+  # Kafka consumer lag（kafka-exporter，容器内同网络）。
+  - job_name: kafka-exporter
+    static_configs:
+      - targets: ["kafka-exporter:9308"]
+
+  # Prometheus 自监控。
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

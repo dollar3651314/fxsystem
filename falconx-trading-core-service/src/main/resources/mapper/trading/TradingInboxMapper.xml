@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingInboxMapper">
+
+    <insert id="insertProcessedIfAbsent" parameterType="com.falconx.trading.repository.mapper.record.TradingInboxRecord">
+        INSERT IGNORE INTO t_inbox (
+            id,
+            event_id,
+            event_type,
+            source,
+            payload,
+            status,
+            consumed_at,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{id},
+            #{eventId},
+            #{eventType},
+            #{source},
+            CAST(#{payloadJson} AS JSON),
+            #{statusCode},
+            #{consumedAt},
+            #{createdAt},
+            #{updatedAt}
+        )
+    </insert>
+
+    <!-- 2026-05-26 性能加固：删 done 行 cleanup。运行时实测 t_inbox 188 万行 / 724MB，
+         拖累 buffer pool + row lock waits。与 outbox cleanup 同款 LIMIT 防长事务。 -->
+    <delete id="deleteProcessedBefore">
+        DELETE FROM t_inbox
+        WHERE status = 1
+          AND consumed_at IS NOT NULL
+          AND consumed_at &lt; #{cutoff}
+        LIMIT #{limit}
+    </delete>
+</mapper>

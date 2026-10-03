@@ -1,0 +1,47 @@
+# FalconX Kafka consumer lag 告警规则
+# 真源：docs/operations/生产观测与回滚手册.md §2.3（Kafka lag 失败判据）
+# 数据来源：kafka-exporter（danielqsj/kafka-exporter，见 docker-compose.monitoring.yml），
+#           暴露 kafka_consumergroup_lag{consumergroup,topic,partition}；lag 不从业务 JVM 反推。
+groups:
+  - name: falconx-kafka-lag
+    rules:
+      # 高频行情 price.tick：lag > 50000。
+      - alert: FalconxKafkaPriceTickLagHigh
+        expr: sum by (topic, consumergroup) (kafka_consumergroup_lag{topic="falconx.market.price.tick"}) > 50000
+        for: 1m
+        labels:
+          severity: P0
+        annotations:
+          summary: "Kafka price.tick lag 过高：{{ $labels.consumergroup }}"
+          description: "falconx.market.price.tick 消费组 {{ $labels.consumergroup }} lag > 50000，trading 消费跟不上行情推送。"
+
+      # 高频行情 price.tick：lag 持续增长 3 分钟（即便未到 50000 也预警）。
+      # delta(...[3m:]) 已表达「过去 3 分钟净增长」，故不再叠加 for（否则等价要求增长态再持续 3m）。
+      - alert: FalconxKafkaPriceTickLagGrowing
+        expr: delta(sum by (topic, consumergroup) (kafka_consumergroup_lag{topic="falconx.market.price.tick"})[3m:1m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Kafka price.tick lag 持续增长：{{ $labels.consumergroup }}"
+          description: "falconx.market.price.tick lag 在 3 分钟窗口内持续增长，消费速率落后于生产速率。"
+
+      # K 线 kline.update：lag > 1000。
+      - alert: FalconxKafkaKlineLagHigh
+        expr: sum by (topic, consumergroup) (kafka_consumergroup_lag{topic="falconx.market.kline.update"}) > 1000
+        for: 1m
+        labels:
+          severity: P1
+        annotations:
+          summary: "Kafka kline.update lag 过高：{{ $labels.consumergroup }}"
+          description: "falconx.market.kline.update 消费组 {{ $labels.consumergroup }} lag > 1000。"
+
+      # 低频事件（钱包入金 / 出金 / KYC）：lag > 100。
+      - alert: FalconxKafkaLowFreqLagHigh
+        expr: sum by (topic, consumergroup) (kafka_consumergroup_lag{topic=~"falconx.wallet.*|falconx.trading.withdraw.*|falconx.*kyc.*"}) > 100
+        for: 1m
+        labels:
+          severity: P2
+        annotations:
+          summary: "Kafka 低频事件 lag 过高：{{ $labels.topic }}"
+          description: "低频事件 topic {{ $labels.topic }} 消费组 {{ $labels.consumergroup }} lag > 100。"

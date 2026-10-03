@@ -1,0 +1,79 @@
+/* FalconX H5 — auth-gate / auth-form mobile 适配规则
+ * 桌面（≥ 768px）保持原 global.css 中的 .auth-gate / .auth-form 样式不变。
+ * 仅在 < 768px 重排为全屏 + 单页滚动 + 48px touch target。
+ */
+
+@media (max-width: 767px) {
+  .auth-gate {
+    padding: calc(var(--fx-safe-top) + 12px) 20px calc(var(--fx-safe-bottom) + 20px);
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .auth-gate__brand {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding-top: 8vh;
+  }
+
+  .auth-gate__brand .falcon-mark,
+  .auth-gate__brand .falcon-wordmark {
+    transform: scale(0.85);
+    transform-origin: left center;
+  }
+
+  .auth-gate .falcon-backdrop {
+    opacity: 0.4;
+    filter: blur(2px);
+  }
+
+  .language-select {
+    position: fixed;
+    top: calc(var(--fx-safe-top) + 8px);
+    right: 12px;
+    width: auto;
+    font-size: 12px;
+    padding: 4px 8px;
+    z-index: 10;
+  }
+
+  .auth-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fx-space-3);
+    margin-top: var(--fx-space-6);
+  }
+
+  .auth-button {
+    width: 100%;
+    min-height: 48px;
+    font-size: 14px;
+  }
+
+  .auth-form {
+    width: 100%;
+  }
+
+  .auth-form input,
+  .auth-form select {
+    min-height: 48px;
+    font-size: 16px; /* 防 iOS focus 时自动 zoom */
+  }
+
+  .auth-form__name-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--fx-space-3);
+  }
+
+  .auth-form__submit {
+    width: 100%;
+    min-height: 48px;
+    font-size: 15px;
+  }
+}

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.market.repository.mapper.test.MarketSwapRateTestSupportMapper">
+
+    <delete id="deleteAllSwapRates">
+        DELETE FROM t_swap_rate
+    </delete>
+
+    <insert id="upsertSwapRate">
+        INSERT INTO t_swap_rate (
+            id,
+            symbol,
+            long_rate,
+            short_rate,
+            rollover_time,
+            effective_from
+        ) VALUES (
+            FLOOR(RAND() * 900000000000000000) + 100000000000000000,
+            #{symbol},
+            #{longRate},
+            #{shortRate},
+            #{rolloverTime},
+            #{effectiveFrom}
+        )
+        ON DUPLICATE KEY UPDATE
+            long_rate = VALUES(long_rate),
+            short_rate = VALUES(short_rate),
+            rollover_time = VALUES(rollover_time)
+    </insert>
+</mapper>

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingNotificationMapper">
+
+    <resultMap id="recordMap" type="com.falconx.trading.repository.mapper.record.TradingNotificationRecord">
+        <constructor>
+            <idArg column="id"            javaType="java.lang.Long"/>
+            <arg   column="user_id"       javaType="java.lang.Long"/>
+            <arg   column="type"          javaType="java.lang.String"/>
+            <arg   column="template_code" javaType="java.lang.String"/>
+            <arg   column="level"         javaType="java.lang.Integer"/>
+            <arg   column="title"         javaType="java.lang.String"/>
+            <arg   column="body"          javaType="java.lang.String"/>
+            <arg   column="related_key"   javaType="java.lang.String"/>
+            <arg   column="related_id"    javaType="java.lang.Long"/>
+            <arg   column="payload_json"  javaType="java.lang.String"/>
+            <arg   column="status"        javaType="java.lang.Integer"/>
+            <arg   column="read_at"       javaType="java.time.LocalDateTime"/>
+            <arg   column="created_at"    javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="cols">
+        id, user_id, type, template_code, level, title, body, related_key, related_id,
+        payload_json, status, read_at, created_at
+    </sql>
+
+    <insert id="insert" parameterType="com.falconx.trading.repository.mapper.record.TradingNotificationRecord">
+        INSERT INTO t_notification (<include refid="cols"/>) VALUES (
+            #{id}, #{userId}, #{type}, #{templateCode}, #{level}, #{title}, #{body},
+            #{relatedKey}, #{relatedId}, #{payloadJson}, #{status},
+            #{readAt}, #{createdAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="recordMap">
+        SELECT <include refid="cols"/> FROM t_notification WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_notification
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(1) FROM t_notification WHERE user_id = #{userId}
+    </select>
+
+    <select id="countUnreadByUserId" resultType="int">
+        SELECT COUNT(1) FROM t_notification
+        WHERE user_id = #{userId} AND status = 0
+    </select>
+
+    <update id="markRead">
+        UPDATE t_notification
+        SET status = 1, read_at = #{readAt}
+        WHERE id = #{id} AND user_id = #{userId} AND status = 0
+    </update>
+
+    <update id="markAllRead">
+        UPDATE t_notification
+        SET status = 1, read_at = #{readAt}
+        WHERE user_id = #{userId} AND status = 0
+    </update>
+
+    <select id="countByRelated" resultType="int">
+        SELECT COUNT(1) FROM t_notification
+        WHERE related_key = #{relatedKey} AND related_id = #{relatedId}
+    </select>
+
+    <select id="selectByAdminFilters" resultMap="recordMap">
+        SELECT <include refid="cols"/>
+        FROM t_notification
+        WHERE 1 = 1
+        <if test="userId != null">AND user_id = #{userId}</if>
+        <if test="type != null">AND type = #{type}</if>
+        <if test="templateCode != null">AND template_code = #{templateCode}</if>
+        <if test="levelCode != null">AND level = #{levelCode}</if>
+        <if test="statusCode != null">AND status = #{statusCode}</if>
+        <if test="fromCreatedAt != null">AND created_at &gt;= #{fromCreatedAt}</if>
+        <if test="toCreatedAt != null">AND created_at &lt; #{toCreatedAt}</if>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByAdminFilters" resultType="long">
+        SELECT COUNT(1) FROM t_notification
+        WHERE 1 = 1
+        <if test="userId != null">AND user_id = #{userId}</if>
+        <if test="type != null">AND type = #{type}</if>
+        <if test="templateCode != null">AND template_code = #{templateCode}</if>
+        <if test="levelCode != null">AND level = #{levelCode}</if>
+        <if test="statusCode != null">AND status = #{statusCode}</if>
+        <if test="fromCreatedAt != null">AND created_at &gt;= #{fromCreatedAt}</if>
+        <if test="toCreatedAt != null">AND created_at &lt; #{toCreatedAt}</if>
+    </select>
+</mapper>

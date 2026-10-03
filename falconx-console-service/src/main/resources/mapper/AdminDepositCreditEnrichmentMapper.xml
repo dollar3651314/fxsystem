@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.console.repository.mapper.AdminDepositCreditEnrichmentMapper">
+
+    <resultMap id="adminDepositCreditMap"
+               type="com.falconx.console.repository.mapper.record.AdminDepositCreditRecord">
+        <constructor>
+            <idArg column="wallet_tx_id" javaType="java.lang.Long"/>
+            <arg column="status_code" javaType="java.lang.Integer"/>
+            <arg column="rejection_reason" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <!--
+      跨 schema 查 trading 端的 t_deposit 入账事实。
+      console-service 自身 schema 没有 t_deposit，故显式带 falconx_trading. 前缀。
+      用 wallet_tx_id IN (...) 批量减少 round-trip。
+    -->
+    <select id="selectByWalletTxIds" resultMap="adminDepositCreditMap">
+        SELECT
+            wallet_tx_id,
+            status            AS status_code,
+            rejection_reason
+        FROM falconx_trading.t_deposit
+        WHERE wallet_tx_id IN
+            <foreach collection="walletTxIds" item="wtxId" open="(" separator="," close=")">
+                #{wtxId}
+            </foreach>
+    </select>
+</mapper>

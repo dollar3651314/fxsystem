@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.identity.repository.mapper.test.IdentityTestSupportMapper">
+
+    <delete id="deleteInbox">DELETE FROM t_inbox</delete>
+    <delete id="deleteRefreshTokenSession">DELETE FROM t_refresh_token_session</delete>
+    <delete id="deleteUser">DELETE FROM t_user</delete>
+
+    <select id="selectUserStatusById" resultType="java.lang.Integer">
+        SELECT status
+        FROM t_user
+        WHERE id = #{userId}
+    </select>
+
+    <select id="countRefreshTokenSession" resultType="java.lang.Integer">
+        SELECT COUNT(1)
+        FROM t_refresh_token_session
+    </select>
+
+    <select id="countUsedRefreshTokenSession" resultType="java.lang.Integer">
+        SELECT COUNT(1)
+        FROM t_refresh_token_session
+        WHERE used = 1
+    </select>
+
+    <select id="countProcessedInboxByEventId" resultType="java.lang.Integer">
+        SELECT COUNT(1)
+        FROM t_inbox
+        WHERE event_id = #{eventId}
+          AND status = 1
+    </select>
+
+    <select id="countUsersById" resultType="java.lang.Integer">
+        SELECT COUNT(1)
+        FROM t_user
+        WHERE id = #{userId}
+    </select>
+
+    <select id="selectActivatedAtByUserId" resultType="java.lang.String">
+        SELECT CAST(activated_at AS CHAR)
+        FROM t_user
+        WHERE id = #{userId}
+    </select>
+
+    <select id="selectEmailVerifiedByUserId" resultType="java.lang.Boolean">
+        SELECT email_verified
+        FROM t_user
+        WHERE id = #{userId}
+    </select>
+
+    <select id="selectProcessedInboxPayloadJsonByEventId" resultType="java.lang.String">
+        SELECT CAST(payload AS CHAR)
+        FROM t_inbox
+        WHERE event_id = #{eventId}
+          AND status = 1
+    </select>
+
+    <insert id="insertPendingDepositUser">
+        INSERT INTO t_user (
+            id,
+            uid,
+            email,
+            password_hash,
+            status
+        ) VALUES (
+            #{userId},
+            #{uid},
+            #{email},
+            #{passwordHash},
+            0
+        )
+    </insert>
+
+    <delete id="deleteKycSubmission">DELETE FROM t_kyc_submission</delete>
+    <delete id="deleteKycDocument">DELETE FROM t_kyc_document</delete>
+
+    <select id="selectKycLevelByUserId" resultType="java.lang.Integer">
+        SELECT kyc_level FROM t_user WHERE id = #{userId}
+    </select>
+
+    <select id="countKycSubmissionByUserId" resultType="java.lang.Integer">
+        SELECT COUNT(1) FROM t_kyc_submission WHERE user_id = #{userId}
+    </select>
+
+    <select id="countKycDocumentBySubmissionId" resultType="java.lang.Integer">
+        SELECT COUNT(1) FROM t_kyc_document WHERE submission_id = #{submissionId}
+    </select>
+
+    <select id="selectKycSubmissionStatusById" resultType="java.lang.Integer">
+        SELECT status FROM t_kyc_submission WHERE id = #{submissionId}
+    </select>
+
+    <select id="selectKycRejectReasonById" resultType="java.lang.String">
+        SELECT reject_reason FROM t_kyc_submission WHERE id = #{submissionId}
+    </select>
+
+    <select id="selectKycReviewerIdById" resultType="java.lang.Long">
+        SELECT reviewer_id FROM t_kyc_submission WHERE id = #{submissionId}
+    </select>
+
+    <select id="selectKycReviewAtById" resultType="java.lang.String">
+        SELECT CAST(review_at AS CHAR) FROM t_kyc_submission WHERE id = #{submissionId}
+    </select>
+
+    <select id="selectKycDocumentSha256" resultType="java.lang.String">
+        SELECT sha256 FROM t_kyc_document
+        WHERE submission_id = #{submissionId} AND doc_type = #{docType}
+    </select>
+
+    <insert id="insertActiveUser">
+        INSERT INTO t_user (
+            id, uid, email, password_hash, status, kyc_level
+        ) VALUES (
+            #{userId}, #{uid}, #{email}, #{passwordHash}, 1, 0
+        )
+    </insert>
+
+    <update id="forcePendingSubmissionToApproved">
+        UPDATE t_kyc_submission
+        SET status = 1, reviewer_id = 999, review_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{submissionId}
+    </update>
+</mapper>

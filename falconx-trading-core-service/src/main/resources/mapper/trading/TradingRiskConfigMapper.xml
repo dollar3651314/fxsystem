@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingRiskConfigMapper">
+
+    <resultMap id="tradingRiskConfigRecordMap" type="com.falconx.trading.repository.mapper.record.TradingRiskConfigRecord">
+        <constructor>
+            <idArg column="id"                    javaType="java.lang.Long"/>
+            <arg   column="symbol"                javaType="java.lang.String"/>
+            <arg   column="market_code"           javaType="java.lang.String"/>
+            <arg   column="max_position_per_user" javaType="java.math.BigDecimal"/>
+            <arg   column="max_position_total"    javaType="java.math.BigDecimal"/>
+            <arg   column="maintenance_margin_rate" javaType="java.math.BigDecimal"/>
+            <arg   column="max_leverage"          javaType="java.lang.Integer"/>
+            <arg   column="hedge_threshold_usd"   javaType="java.math.BigDecimal"/>
+            <arg   column="direction_imbalance_ratio_threshold" javaType="java.math.BigDecimal"/>
+            <arg   column="direction_imbalance_min_total_usd"   javaType="java.math.BigDecimal"/>
+            <arg   column="pending_order_min_distance_ratio"    javaType="java.math.BigDecimal"/>
+            <arg   column="created_at"            javaType="java.time.LocalDateTime"/>
+            <arg   column="updated_at"            javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectBySymbol" resultMap="tradingRiskConfigRecordMap">
+        SELECT id,
+               symbol,
+               market_code,
+               max_position_per_user,
+               max_position_total,
+               maintenance_margin_rate,
+               max_leverage,
+               hedge_threshold_usd,
+               direction_imbalance_ratio_threshold,
+               direction_imbalance_min_total_usd,
+               pending_order_min_distance_ratio,
+               created_at,
+               updated_at
+        FROM t_risk_config
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="selectPlatformRow" resultMap="tradingRiskConfigRecordMap">
+        SELECT id,
+               symbol,
+               market_code,
+               max_position_per_user,
+               max_position_total,
+               maintenance_margin_rate,
+               max_leverage,
+               hedge_threshold_usd,
+               direction_imbalance_ratio_threshold,
+               direction_imbalance_min_total_usd,
+               pending_order_min_distance_ratio,
+               created_at,
+               updated_at
+        FROM t_risk_config
+        WHERE symbol IS NULL
+        LIMIT 1
+    </select>
+
+    <!-- STAGE-14C1 Task 8: 平台行 MarginLevel 阈值（V31 新增 stop_out_level / margin_call_level，小数口径） -->
+    <select id="selectPlatformMarginThresholds"
+            resultType="com.falconx.trading.service.model.MarginThresholds">
+        SELECT stop_out_level    AS stopOutLevel,
+               margin_call_level AS marginCallLevel
+        FROM t_risk_config
+        WHERE symbol IS NULL
+        LIMIT 1
+    </select>
+
+    <!-- STAGE-14D3a Task 2: 平台行冷静期秒数（symbol IS NULL；无行返回 null，caller 回退 properties 默认） -->
+    <select id="selectPlatformCoolingPeriodSeconds" resultType="java.lang.Integer">
+        SELECT cooling_period_seconds
+        FROM t_risk_config
+        WHERE symbol IS NULL
+        LIMIT 1
+    </select>
+
+    <select id="selectSymbolsByMarketCode" resultType="java.lang.String">
+        SELECT symbol
+        FROM t_risk_config
+        WHERE market_code = #{marketCode}
+    </select>
+
+    <sql id="riskConfigAdminWhere">
+        <where>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+            <if test="marketCode != null and marketCode != ''">AND market_code = #{marketCode}</if>
+        </where>
+    </sql>
+
+    <select id="selectAdminPaginated" resultMap="tradingRiskConfigRecordMap">
+        SELECT id, symbol, market_code, max_position_per_user, max_position_total,
+               maintenance_margin_rate, max_leverage, hedge_threshold_usd,
+               direction_imbalance_ratio_threshold, direction_imbalance_min_total_usd,
+               pending_order_min_distance_ratio,
+               created_at, updated_at
+        FROM t_risk_config
+        <include refid="riskConfigAdminWhere"/>
+        ORDER BY symbol ASC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminFiltered" resultType="long">
+        SELECT COUNT(1) FROM t_risk_config
+        <include refid="riskConfigAdminWhere"/>
+    </select>
+
+    <insert id="insertAdmin" parameterType="com.falconx.trading.repository.mapper.record.TradingRiskConfigRecord">
+        INSERT INTO t_risk_config (
+            id, symbol, market_code, max_position_per_user, max_position_total,
+            maintenance_margin_rate, max_leverage, hedge_threshold_usd,
+            direction_imbalance_ratio_threshold, direction_imbalance_min_total_usd,
+            pending_order_min_distance_ratio,
+            created_at, updated_at
+        ) VALUES (
+            #{id}, #{symbol}, #{marketCode}, #{maxPositionPerUser}, #{maxPositionTotal},
+            #{maintenanceMarginRate}, #{maxLeverage}, #{hedgeThresholdUsd},
+            #{directionImbalanceRatioThreshold}, #{directionImbalanceMinTotalUsd},
+            #{pendingOrderMinDistanceRatio},
+            #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <update id="updateAdminBySymbol">
+        UPDATE t_risk_config
+        SET max_position_per_user = #{maxPositionPerUser},
+            max_position_total    = #{maxPositionTotal},
+            max_leverage          = #{maxLeverage},
+            hedge_threshold_usd   = #{hedgeThresholdUsd},
+            updated_at            = #{updatedAt}
+        WHERE symbol = #{symbol}
+    </update>
+
+    <!-- BBOOK-RISK-CONTROL-01: 方向集中度配置更新 -->
+    <update id="updateDirectionImbalance">
+        UPDATE t_risk_config
+        SET direction_imbalance_ratio_threshold = #{ratioThreshold},
+            direction_imbalance_min_total_usd   = #{minTotalUsd},
+            updated_at                          = #{updatedAt}
+        WHERE symbol = #{symbol}
+    </update>
+
+    <!-- BBOOK-RISK-CONTROL-01: 平台 hedge_threshold_usd 更新（symbol IS NULL 行） -->
+    <update id="updatePlatformHedgeThreshold">
+        UPDATE t_risk_config
+        SET hedge_threshold_usd = #{hedgeThresholdUsd},
+            updated_at          = #{updatedAt}
+        WHERE symbol IS NULL
+    </update>
+
+    <!-- STAGE-14D3a Task 3: 平台行冷静期秒数写（symbol IS NULL 行） -->
+    <update id="updatePlatformCoolingPeriodSeconds">
+        UPDATE t_risk_config
+        SET cooling_period_seconds = #{coolingPeriodSeconds}
+        WHERE symbol IS NULL
+    </update>
+
+    <!-- STAGE-14D3a Task 3: 平台行 MarginLevel 阈值写（symbol IS NULL 行） -->
+    <update id="updatePlatformMarginThresholds">
+        UPDATE t_risk_config
+        SET stop_out_level    = #{stopOutLevel},
+            margin_call_level = #{marginCallLevel}
+        WHERE symbol IS NULL
+    </update>
+
+    <delete id="deleteBySymbol">
+        DELETE FROM t_risk_config WHERE symbol = #{symbol}
+    </delete>
+</mapper>

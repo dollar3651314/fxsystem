@@ -1,0 +1,101 @@
+spring:
+  # 2026-05-27 Sprint 6 顺序5：JDK 25 + Spring Boot 4 虚拟线程（Tomcat 请求 + @Async + @Scheduled）。
+  # JEP 491 已解决 synchronized pinning；自定义线程池（分区 executor/dispatcher/扫块 poller）不受影响仍用平台线程。
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: falconx-console-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/falconx_console?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${FALCONX_CONSOLE_DB_USERNAME}
+    password: ${FALCONX_CONSOLE_DB_PASSWORD}
+    hikari:
+      # STAGE-12 perf：默认 HikariCP idleTimeout/maxLifetime 不主动 evict，
+      # 实测 MySQL processlist 多条 Sleep>16000s（4-7h）。显式收紧到 10min/30min。
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      keepalive-time: 300000
+  data:
+    redis:
+      host: ${FALCONX_REDIS_HOST:localhost}
+      port: ${FALCONX_REDIS_PORT:6380}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+
+server:
+  port: 18085
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level --- [%15.15t] [traceId=%X{traceId:-}] %logger{39} : %msg%n%ex"
+
+falconx:
+  console:
+    token:
+      issuer: falconx-console-service
+      access-token-ttl: 30m
+      refresh-token-ttl: 8h
+    password:
+      bcrypt-strength: 12
+    security:
+      login-failure-limit: 5
+      login-lock-duration: 15m
+      # STAGE-12 安全：之前默认 false，admin /admin/** 接口暴露给任何能访问 gateway 的 IP。
+      # 默认改 true + 本机 + docker bridge 白名单。生产环境通过 env 覆盖配置：
+      # FALCONX_CONSOLE_IP_WHITELIST_ENABLED=true / FALCONX_CONSOLE_IP_WHITELIST=ip1,ip2
+      # （Spring Boot 对 List<String> 配置自动按 comma 拆分）。
+      ip-whitelist-enabled: ${FALCONX_CONSOLE_IP_WHITELIST_ENABLED:true}
+      ip-whitelist:
+        - 127.0.0.1
+        - "::1"
+        - 172.16.0.0/12
+        - 10.0.0.0/8
+    key-pair:
+      # 管理端 JWT 独立私钥（与 C 端 identity-service 隔离）
+      # 生产环境通过环境变量注入；dev 环境通过 application-dev.yml 提供本地开发密钥
+      private-key-pem: ${FALCONX_CONSOLE_PRIVATE_KEY_PEM}
+      public-key-pem: ${FALCONX_CONSOLE_PUBLIC_KEY_PEM}
+    # STAGE-13 系统配置中心：各 service 拉 /internal/v1/system-config 时校验此 token。
+    # dev / test 默认 falconx-internal-dev-token；prod / staging 通过环境变量 FALCONX_INTERNAL_API_TOKEN 注入。
+    internal-api:
+      token: ${FALCONX_INTERNAL_API_TOKEN:falconx-internal-dev-token}
+    initial-super-admin:
+      # 仅作为 V1 init schema 默认超管的提示（实际超管由 SQL 直接 INSERT，首次登录强制改密）
+      username: superadmin
+    # STAGE-2-CUSTOMER：调用 business-service internal RPC 配置
+    internal-rpc:
+      gateway-base-url: ${FALCONX_GATEWAY_BASE_URL:http://localhost:18080}
+      connect-timeout: 2s
+      read-timeout: 5s
+    # STAGE-2-CUSTOMER：调余额限额（按管理端架构 §4.4）
+    # 2026-05-18 调大：单笔 100k / 日累计 1M（运营常规调账场景需要）
+    balance-adjust:
+      single-limit-usd: 100000
+      daily-limit-usd: 1000000
+
+# STAGE-11-OBS-RECON §14.5 actuator endpoints（运维 / canary / k8s probe 用，不暴露给前端）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers,prometheus,threaddump,heapdump
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+    loggers:
+      enabled: true
+  info:
+    git:
+      mode: simple
+    build:
+      enabled: true

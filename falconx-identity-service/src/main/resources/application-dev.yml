@@ -1,0 +1,51 @@
+spring:
+  datasource:
+    username: root
+    password: root
+  data:
+    redis:
+      host: localhost
+      port: ${FALCONX_REDIS_PORT:6380}
+
+falconx:
+  identity:
+    key-pair:
+      private-key-pem: |
+        -----BEGIN PRIVATE KEY-----
+        MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDpEXzQR+4ufMeo
+        eNQcFN+4qLchG2EqmVLmSrsJWveQJR2wlQNZbAW5/BnaIEDc4OU7GFxdC7Y/tEpU
+        fzQpVLgJwb4okycrckGHuJ6yy1GBn+dRc+KCDY1QRWEdHjtFHs2MltTlOJXoAda8
+        zucRYuEWQMTp0rfFz4FS/NNGjA/qlcHP9LS1iUFXaeidh4wqJUGNKavGFR+RA6e+
+        Gr5ljmFfisMvY+R7qfih1x2L64Qp8fjdwF0T0lv6S8x2sCtd52xn2DLF4rJegXym
+        1fbpgLWFkiQd9OtmXihnP+FQadhcLt0IDQ2rXQo1unJEWODmBet28dubXaX9jcQD
+        fP7zyrrXAgMBAAECggEABWKSa4fSvGGi0mcvfqNGB+YfYZ2txEqSSCTjjVxZ36UK
+        S5t7qvYYFpP5Od/ACYL8mwqB4sDgn0lR9axv7u4BNrWQcOsXWsNlW5z++bN0UmuS
+        LAliledoUo76fDalxZmBodhQ2nz7pbVvkV1LZHdYxMUXNHJi2AZM7gPoCi7gv2Zn
+        2PlJiH4hgX78ndz+LraeFeOGqm41xsfWDl7SO1iX4N1F2PI+AOyzQk2qvyXK11Vf
+        0o4iaeecao8nDp8vEXDMGl6ZeOFzD9jercjzn6oiU1Lkp00jAx8BPR9fxDssbSTy
+        lKRxyzCsbPFOHyCDe0eExO2acAjM9X82K+S9i10bPQKBgQD9NuedMRFFFWyth+Bn
+        CEIT1x/hs5p1bDgCo8djIDU2VVhc3aXWvu0+ubjYgaNpIUAElmtELBzaAjOamKZP
+        xE/YKr0uaXqZVPdfZU+tj1hYBeYYq5xRFDPKU+avm3wTsXmFi9YrxMo9pyvAq+JY
+        EtR3zdUb1OFSPPzj5fvNNLB8TQKBgQDrodkH3Zwxc5fl9AN06XFu/CtFemw/gC7Q
+        /vgxKbghyyxJ9WtM6QUIBjOKYahmW7JREnCnckHU5MakVpWZ1J4eup9p/8BI7AV/
+        TvzwUMVEpHOFCv6GKK+bU/Hr4J/pL9rnN9pArUcvn+6MA19GkhH+CTNl48Wmkhh6
+        61MuLbeVswKBgDI/S/TggMnRt5Az727ir6IaRWRXbKYyhGbZsz5TbNvMUc2T2k3j
+        81ZIKoskJpY9F+QRKVYM3ujQGQdrlU0s6p890+661a5JsxEGHKqXUHOfMArjOxDH
+        zoMu5Q8h7pxF0pSSrDxhP7S+UKtaMH9DtU/U055DPzc/jPt4buBIvWDdAoGBAM86
+        funI/4YKOCvXh3a5m7ZU9iVbfnn2XLYXluV94F9wFNpSiXSRdohRE+D+9CBZQqDE
+        S+kntjfqn7yGHXm1oP47eNm7QDuhv0/wgslC78rnqmT2f1Qz0gUUNa4R1fE50hYJ
+        a9v3yKRczmm6yX8CFerJ4rcYM4rD792iunvhXxS7AoGAANVQ4bIdZ9R15wlVHwMx
+        K1pHN92mwh0nYEHyPwkyYhBj9biUD1RQlasZgO383J7WkuCdFc090tskCnKuyGlH
+        DQU1mSWJu5s91YQQK01aGO7b2PyQzdbW+H58gmxXbcXTteffkqkp4GxLh2GfgTgL
+        KkpAX18F0mENe5bPKhHdf78=
+        -----END PRIVATE KEY-----
+      public-key-pem: |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6RF80EfuLnzHqHjUHBTf
+        uKi3IRthKplS5kq7CVr3kCUdsJUDWWwFufwZ2iBA3ODlOxhcXQu2P7RKVH80KVS4
+        CcG+KJMnK3JBh7iesstRgZ/nUXPigg2NUEVhHR47RR7NjJbU5TiV6AHWvM7nEWLh
+        FkDE6dK3xc+BUvzTRowP6pXBz/S0tYlBV2nonYeMKiVBjSmrxhUfkQOnvhq+ZY5h
+        X4rDL2Pke6n4odcdi+uEKfH43cBdE9Jb+kvMdrArXedsZ9gyxeKyXoF8ptX26YC1
+        hZIkHfTrZl4oZz/hUGnYXC7dCA0Nq10KNbpyRFjg5gXrdvHbm12l/Y3EA3z+88q6
+        1wIDAQAB
+        -----END PUBLIC KEY-----

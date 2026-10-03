@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.falconx.trading.repository.mapper.TradingRiskControlActionMapper">
+
+    <resultMap id="tradingRiskControlActionRecordMap"
+               type="com.falconx.trading.repository.mapper.record.TradingRiskControlActionRecord">
+        <constructor>
+            <idArg column="id"              javaType="java.lang.Long"/>
+            <arg   column="symbol"          javaType="java.lang.String"/>
+            <arg   column="action_type"     javaType="java.lang.Integer"/>
+            <arg   column="is_active"       javaType="java.lang.Integer"/>
+            <arg   column="trigger_source"  javaType="java.lang.String"/>
+            <arg   column="trigger_reason"  javaType="java.lang.String"/>
+            <arg   column="hedge_log_id"    javaType="java.lang.Long"/>
+            <arg   column="created_at"      javaType="java.time.LocalDateTime"/>
+            <arg   column="updated_at"      javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <!--
+        幂等插入：仅当同品种+同动作类型+同触发来源下不存在激活记录时才插入。
+        使用 <=> 做 NULL-safe 比较（NULL <=> NULL = TRUE），避免 symbol IS NULL 时失配。
+    -->
+    <insert id="insertIfAbsent"
+            parameterType="com.falconx.trading.repository.mapper.record.TradingRiskControlActionRecord">
+        INSERT INTO t_risk_control_action (
+            id,
+            symbol,
+            action_type,
+            is_active,
+            trigger_source,
+            trigger_reason,
+            hedge_log_id,
+            created_at,
+            updated_at
+        )
+        SELECT
+            #{id},
+            #{symbol},
+            #{actionTypeCode},
+            1,
+            #{triggerSource},
+            #{triggerReason},
+            #{hedgeLogId},
+            #{createdAt},
+            #{updatedAt}
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM t_risk_control_action
+            WHERE symbol          &lt;=> #{symbol}
+              AND action_type      = #{actionTypeCode}
+              AND trigger_source   = #{triggerSource}
+              AND is_active        = 1
+        )
+    </insert>
+
+    <update id="deactivateBySymbolAndTypeAndSource">
+        UPDATE t_risk_control_action
+        SET is_active  = 0,
+            updated_at = #{updatedAt}
+        WHERE symbol         &lt;=> #{symbol}
+          AND action_type     = #{actionTypeCode}
+          AND trigger_source  = #{triggerSource}
+          AND is_active       = 1
+    </update>
+
+    <select id="selectMostSevereActiveBySymbol" resultMap="tradingRiskControlActionRecordMap">
+        SELECT id,
+               symbol,
+               action_type,
+               is_active,
+               trigger_source,
+               trigger_reason,
+               hedge_log_id,
+               created_at,
+               updated_at
+        FROM t_risk_control_action
+        WHERE is_active = 1
+          AND symbol    = #{symbol}
+        ORDER BY action_type DESC
+        LIMIT 1
+    </select>
+
+    <select id="countActiveGlobalPause" resultType="int">
+        SELECT COUNT(*)
+        FROM t_risk_control_action
+        WHERE is_active    = 1
+          AND symbol       IS NULL
+          AND action_type  = 4
+    </select>
+
+    <update id="deactivateBySymbolsAndTypeAndSource">
+        UPDATE t_risk_control_action
+        SET is_active  = 0,
+            updated_at = #{updatedAt}
+        WHERE symbol        IN
+            <foreach collection="symbols" item="sym" open="(" separator="," close=")">
+                #{sym}
+            </foreach>
+          AND action_type    = #{actionTypeCode}
+          AND trigger_source = #{triggerSource}
+          AND is_active      = 1
+    </update>
+
+    <sql id="riskActionAdminWhere">
+        <where>
+            <if test="symbol != null and symbol != ''">AND symbol = #{symbol}</if>
+            <if test="actionTypeCode != null">AND action_type = #{actionTypeCode}</if>
+            <if test="triggerSource != null and triggerSource != ''">AND trigger_source = #{triggerSource}</if>
+            <if test="isActive != null">AND is_active = #{isActive}</if>
+            <!-- STAGE-9-RISK-OPS-COMPLETE：历史审计查询用时间窗 -->
+            <if test="fromCreatedAt != null">AND created_at &gt;= #{fromCreatedAt}</if>
+            <if test="toCreatedAt != null">AND created_at &lt;= #{toCreatedAt}</if>
+        </where>
+    </sql>
+
+    <select id="selectAdminPaginated" resultMap="tradingRiskControlActionRecordMap">
+        SELECT id, symbol, action_type, is_active, trigger_source, trigger_reason, hedge_log_id, created_at, updated_at
+        FROM t_risk_control_action
+        <include refid="riskActionAdminWhere"/>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminFiltered" resultType="long">
+        SELECT COUNT(1) FROM t_risk_control_action
+        <include refid="riskActionAdminWhere"/>
+    </select>
+
+    <select id="selectById" resultMap="tradingRiskControlActionRecordMap">
+        SELECT id, symbol, action_type, is_active, trigger_source, trigger_reason, hedge_log_id, created_at, updated_at
+        FROM t_risk_control_action
+        WHERE id = #{id}
+    </select>
+
+    <update id="deactivateAdminById">
+        UPDATE t_risk_control_action
+        SET is_active = 0, updated_at = #{updatedAt}
+        WHERE id = #{id}
+          AND is_active = 1
+          AND trigger_source = 'MANUAL_ADMIN'
+    </update>
+
+</mapper>

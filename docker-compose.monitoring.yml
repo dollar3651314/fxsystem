@@ -1,0 +1,78 @@
+# FalconX 本地监控验证栈：Prometheus + Alertmanager + Grafana + kafka-exporter
+#
+# 用途：本地验证 deploy/monitoring/ 下的抓取配置、告警规则与仪表盘；以及做告警链路实跑演练。
+# 启动：docker compose -f docker-compose.monitoring.yml up -d
+# 访问：Prometheus http://localhost:9090  Alertmanager http://localhost:9093  Grafana http://localhost:3000 (admin/admin)
+# 停止：docker compose -f docker-compose.monitoring.yml down
+#
+# 说明：
+# - Prometheus 经 host.docker.internal 抓取宿主上 local-start.sh 启动的 6 个后端服务（18080-18085）。
+# - kafka-exporter 接 falconx_default 网络上的 falconx-kafka；本地 kafka 的 advertised listener 为
+#   localhost:9092，容器内客户端可能无法解析回 broker（本地基础设施限制），lag 指标在本地未必可得；
+#   Kafka 告警规则已由 promtool 单测验证，生产/演示档（正常 advertised listener）下 kafka-exporter 正常工作。
+networks:
+  falconx_default:
+    external: true
+
+volumes:
+  grafana-data:
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: falconx-prometheus
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./deploy/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/monitoring/prometheus/rules:/etc/prometheus/rules:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    networks:
+      - falconx_default
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: falconx-alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./deploy/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    ports:
+      - "9093:9093"
+    networks:
+      - falconx_default
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: falconx-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - falconx_default
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.7.0
+    container_name: falconx-kafka-exporter
+    restart: unless-stopped
+    command:
+      - "--kafka.server=falconx-kafka:9092"
+    ports:
+      - "9308:9308"
+    networks:
+      - falconx_default
